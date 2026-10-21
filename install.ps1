@@ -16,13 +16,18 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
   if (Test-Path "$Dest\.git") {
     Write-Host "existing install at $Dest — git pull" -ForegroundColor Cyan
     git -C $Dest pull --ff-only
+  } elseif (Get-Command git -ErrorAction SilentlyContinue) {
+    Write-Host "cloning $repo -> $Dest" -ForegroundColor Cyan
+    git clone --depth 1 "https://github.com/$repo.git" $Dest
   } else {
-    Write-Host "downloading $repo -> $Dest" -ForegroundColor Cyan
+    Write-Host "downloading $repo -> $Dest (no git; snapshots can't git-update)" -ForegroundColor Cyan
     $zip = "$env:TEMP\agentsys.zip"
     Invoke-WebRequest "https://github.com/$repo/archive/refs/heads/master.zip" -OutFile $zip
     Expand-Archive $zip "$env:TEMP\agentsys-x" -Force
     Move-Item "$env:TEMP\agentsys-x\agentsys-master" $Dest -Force
     Remove-Item $zip, "$env:TEMP\agentsys-x" -Recurse -Force
+    $sha = (Invoke-RestMethod "https://api.github.com/repos/$repo/commits/master").sha
+    Set-Content "$Dest\COMMIT" $sha
   }
   $args2 = @("-Systems", ($Systems -join ','))
   if ($SkipModels) { $args2 += '-SkipModels' }

@@ -214,6 +214,47 @@ def cmd_doctor():
     print("doctor:", "healthy" if ok else "issues found")
 
 
+REPO = "JoShMiQueL/agentsys"
+
+
+def remote_sha() -> str | None:
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{REPO}/commits/master",
+            headers={"User-Agent": "agentsys"})
+        return json.load(urllib.request.urlopen(req, timeout=10))["sha"]
+    except Exception:
+        return None
+
+
+def local_sha() -> str | None:
+    if (ROOT / ".git").exists():
+        r = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+                           capture_output=True, text=True)
+        return r.stdout.strip() or None
+    f = ROOT / "COMMIT"
+    return f.read_text().strip() if f.exists() else None
+
+
+def cmd_update():
+    remote = remote_sha()
+    if not remote:
+        print("cannot reach github — check connectivity")
+        return
+    local = local_sha()
+    if local == remote:
+        print(f"up to date ({remote[:8]})")
+        return
+    print(f"update available: {(local or '?')[:8]} -> {remote[:8]}")
+    if (ROOT / ".git").exists():
+        subprocess.run(["git", "-C", str(ROOT), "pull", "--ff-only"], check=True)
+    else:
+        print("zip install (no .git) — re-run the irm install command to update code")
+        return
+    print("re-applying installed systems...")
+    cmd_sync()
+
+
 USAGE = __doc__
 
 
@@ -233,6 +274,8 @@ def main() -> int:
         cmd_sync(); return 0
     if cmd == "status":
         cmd_status(); return 0
+    if cmd == "update":
+        cmd_update(); return 0
     if cmd == "doctor":
         cmd_doctor(); return 0
     print(USAGE)
