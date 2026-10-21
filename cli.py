@@ -15,6 +15,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -240,6 +241,11 @@ def local_version() -> str | None:
     return None
 
 
+def _ver(s: str) -> tuple:
+    """'v0.2.10' -> (0, 2, 10) for correct ordering."""
+    return tuple(int(x) for x in re.findall(r"\d+", s or ""))
+
+
 def cmd_update():
     remote = remote_tag()
     if not remote:
@@ -276,12 +282,16 @@ def cmd_update():
         shutil.copytree(src, ROOT, dirs_exist_ok=True)
         shutil.rmtree(tmp, ignore_errors=True)
     (ROOT / "VERSION").write_text(remote + "\n")
+    # refresh notice cache so it doesn't nag about a version we just installed
+    st = load_json(STATE, {"installed": {}})
+    st["update_check"] = {"at": datetime.now().timestamp(), "latest": remote}
+    save_json(STATE, st)
     print("re-applying installed systems...")
     cmd_sync()
 
 
 def notice_update():
-    """Cached (24h) 'update available' nudge appended after any command."""
+    """Cached (1h) 'update available' nudge appended after any command."""
     try:
         st = load_json(STATE, {"installed": {}})
         cache = st.get("update_check") or {}
@@ -294,7 +304,7 @@ def notice_update():
                 save_json(STATE, st)
         latest = cache.get("latest")
         local = local_version()
-        if latest and local and latest != local:
+        if latest and local and _ver(latest) > _ver(local):
             if sys.platform == "win32":
                 os.system("")  # enable ANSI on Windows console
             print(f"\n\033[33m[agentsys] new version {latest} (you have {local})"
