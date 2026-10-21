@@ -1,15 +1,38 @@
-# install.ps1 — install agent systems from systems/<name>/
-# Usage:
-#   .\install.ps1                        # reversing only (default)
-#   .\install.ps1 -Systems reversing,devin
-#   .\install.ps1 -Systems devin -SkipModels
+# install.ps1 — agent-systems installer (bun-style)
+# Remote:  powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agent-systems/master/install.ps1 | iex"
+# Local:   .\install.ps1 [-Systems a,b] [-SkipModels] [-NoDeps]
 param(
   [string[]]$Systems = @('reversing'),
   [switch]$SkipModels,
-  [switch]$NoDeps
+  [switch]$NoDeps,
+  [string]$Dest = "$env:USERPROFILE\.agent-systems"
 )
 
 $ErrorActionPreference = 'Stop'
+
+# --- bootstrap: running via irm (no local repo) -> fetch repo, re-run self ---
+if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems'))) {
+  $repo = 'JoShMiQueL/agent-systems'
+  if (Test-Path "$Dest\.git") {
+    Write-Host "existing install at $Dest — git pull" -ForegroundColor Cyan
+    git -C $Dest pull --ff-only
+  } else {
+    Write-Host "downloading $repo -> $Dest" -ForegroundColor Cyan
+    $zip = "$env:TEMP\agent-systems.zip"
+    Invoke-WebRequest "https://github.com/$repo/archive/refs/heads/master.zip" -OutFile $zip
+    Expand-Archive $zip "$env:TEMP\agent-systems-x" -Force
+    Move-Item "$env:TEMP\agent-systems-x\agent-systems-master" $Dest -Force
+    Remove-Item $zip, "$env:TEMP\agent-systems-x" -Recurse -Force
+  }
+  $args2 = @("-Systems", ($Systems -join ','))
+  if ($SkipModels) { $args2 += '-SkipModels' }
+  if ($NoDeps) { $args2 += '-NoDeps' }
+  powershell -ExecutionPolicy Bypass -File "$Dest\install.ps1" @args2
+  powershell -ExecutionPolicy Bypass -File "$Dest\register-cli.ps1"
+  Write-Host "`nDone. Open a new terminal: agentsys doctor" -ForegroundColor Green
+  exit 0
+}
+
 $root = $PSScriptRoot
 
 function Ensure-Dep($cmd, $wingetId, $name) {
