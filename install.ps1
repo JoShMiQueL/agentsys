@@ -17,7 +17,8 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
   try { $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/tags")[0].name } catch {}
   $ref = if ($tag) { "refs/tags/$tag" } else { 'master' }
   if (Test-Path $Dest) {
-    Write-Host "existing install at $Dest — overlaying latest ($ref)" -ForegroundColor Cyan
+    Write-Host "existing install at $Dest — clean reinstall ($ref)" -ForegroundColor Cyan
+    Remove-Item "$Dest\*" -Recurse -Force
   } else {
     Write-Host "downloading $repo @ $ref -> $Dest" -ForegroundColor Cyan
   }

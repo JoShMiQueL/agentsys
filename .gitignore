@@ -2,3 +2,5 @@ sandbox/
 __pycache__/
 *.pyc
 tools/bench/results/*/out_*.txt
+VERSION
+COMMIT

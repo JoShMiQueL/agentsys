@@ -249,15 +249,31 @@ def cmd_update():
         print(f"up to date ({remote})")
         return
     print(f"update available: {local or '?'} -> {remote}")
-    print("applying tag archive...")
-    data = urllib.request.urlopen(urllib.request.Request(
-        f"https://github.com/{REPO}/archive/refs/tags/{remote}.zip",
-        headers={"User-Agent": "agentsys"}), timeout=60).read()
-    tmp = Path(tempfile.mkdtemp())
-    zipfile.ZipFile(io.BytesIO(data)).extractall(tmp)
-    src = next(tmp.iterdir())
-    shutil.copytree(src, ROOT, dirs_exist_ok=True)
-    shutil.rmtree(tmp, ignore_errors=True)
+    if (ROOT / ".git").exists():
+        # dev checkout: keep git semantics
+        subprocess.run(["git", "-C", str(ROOT), "fetch", "--tags", "-f"], check=True)
+        subprocess.run(["git", "-C", str(ROOT), "checkout", remote], check=True)
+    else:
+        print("applying tag archive...")
+        data = urllib.request.urlopen(urllib.request.Request(
+            f"https://github.com/{REPO}/archive/refs/tags/{remote}.zip",
+            headers={"User-Agent": "agentsys"}), timeout=60).read()
+        zf = zipfile.ZipFile(io.BytesIO(data))
+        new_files = {n.split("/", 1)[1] for n in zf.namelist()
+                     if "/" in n and n.split("/", 1)[1]}
+        tmp = Path(tempfile.mkdtemp())
+        zf.extractall(tmp)
+        src = next(tmp.iterdir())
+        # managed install dir: remove files that no longer exist in the release
+        for p in ROOT.rglob("*"):
+            rel = p.relative_to(ROOT).as_posix()
+            if p.is_file() and rel not in new_files and rel != "VERSION":
+                try:
+                    p.unlink()
+                except OSError:
+                    pass
+        shutil.copytree(src, ROOT, dirs_exist_ok=True)
+        shutil.rmtree(tmp, ignore_errors=True)
     (ROOT / "VERSION").write_text(remote + "\n")
     print("re-applying installed systems...")
     cmd_sync()
