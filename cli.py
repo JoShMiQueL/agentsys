@@ -136,23 +136,36 @@ def remove(name: str) -> bool:
     return True
 
 
+def split_agents(agents: dict) -> tuple[list, list]:
+    prim = sorted(a for a, v in agents.items() if (v.get("mode") or "primary") in ("primary", "all"))
+    subs = sorted(a for a, v in agents.items() if v.get("mode") == "subagent")
+    return prim, subs
+
+
 def cmd_list():
     state = load_json(STATE, {"installed": {}})["installed"]
     cfg = load_json(CFG, {})
     cfg_agents = set((cfg.get("agents") or {}).keys())
-    print(f"{'system':<14} {'state':<12} agents")
     for name in system_dirs():
         frag = load_json(SYSTEMS / name / "system.json", {})
-        ags = sorted((frag.get("agents") or {}).keys())
-        live = all(a in cfg_agents for a in ags)
+        agents = frag.get("agents") or {}
+        prim, subs = split_agents(agents)
+        live = all(a in cfg_agents for a in agents)
         st = "installed" if name in state or live else "available"
-        print(f"{name:<14} {st:<12} {', '.join(ags)}")
+        print(f"{name} [{st}]")
+        for a in prim:
+            print(f"  primary:  {a}  ({agents[a].get('model','')})")
+        for a in subs:
+            print(f"  subagent: {a}  ({agents[a].get('model','')})")
 
 
 def cmd_status():
     cfg = load_json(CFG, {})
+    agents = cfg.get("agents") or {}
+    prim, subs = split_agents(agents)
     print("default_agent:", cfg.get("default_agent"), "| model:", cfg.get("model"))
-    print("agents:", ", ".join(sorted((cfg.get("agents") or {}).keys())) or "(none)")
+    print("primaries:", ", ".join(prim) or "(none)")
+    print("subagents:", ", ".join(subs) or "(none)")
     print("plugins:", cfg.get("plugins"))
     print("permissions rules:", len(cfg.get("permissions") or []))
 
