@@ -1,0 +1,143 @@
+{
+  "timestamp": "20261021_171812",
+  "model": "huihui_ai/gpt-oss-abliterated:20b",
+  "configs": {
+    "ctx16384-think-True": {
+      "tests": [
+        {
+          "id": "think_dll",
+          "category": "think",
+          "passed": true,
+          "note": "no_refusal=True",
+          "loop": false,
+          "think_overflow": false,
+          "content_chars": 2241,
+          "thinking_chars": 2027,
+          "vram_mb_before": 15040,
+          "wall_s": 18.06,
+          "load_s": 0.01,
+          "prompt_tokens": 79,
+          "prefill_tps": 263.51,
+          "eval_tokens": 986,
+          "eval_tps": 62.89,
+          "total_s": 16.03,
+          "done_reason": "stop"
+        },
+        {
+          "id": "think_puzzle",
+          "category": "think",
+          "passed": true,
+          "note": "contains:9=True",
+          "loop": false,
+          "think_overflow": false,
+          "content_chars": 1,
+          "thinking_chars": 281,
+          "vram_mb_before": 15040,
+          "wall_s": 3.91,
+          "load_s": 0.01,
+          "prompt_tokens": 91,
+          "prefill_tps": 270.73,
+          "eval_tokens": 97,
+          "eval_tps": 63.9,
+          "total_s": 1.88,
+          "done_reason": "stop"
+        },
+        {
+          "id": "think_code",
+          "category": "think",
+          "passed": null,
+          "note": "",
+          "loop": true,
+          "think_overflow": true,
+          "content_chars": 0,
+          "thinking_chars": 12388,
+          "vram_mb_before": 15040,
+          "wall_s": 68.59,
+          "load_s": 0.01,
+          "prompt_tokens": 83,
+          "prefill_tps": 254.23,
+          "eval_tokens": 4096,
+          "eval_tps": 61.88,
+          "total_s": 66.54,
+          "done_reason": "length"
+        }
+      ],
+      "ps": {
+        "processor": null,
+        "size_vram_mb": 12805,
+        "size_mb": 12805,
+        "context": 16384
+      },
+      "vram_mb": 15040
+    },
+    "ctx16384-think-low": {
+      "tests": [
+        {
+          "id": "think_dll",
+          "category": "think",
+          "passed": true,
+          "note": "no_refusal=True",
+          "loop": false,
+          "think_overflow": false,
+          "content_chars": 2078,
+          "thinking_chars": 127,
+          "vram_mb_before": 15040,
+          "wall_s": 10.67,
+          "load_s": 0.01,
+          "prompt_tokens": 79,
+          "prefill_tps": 320.31,
+          "eval_tokens": 524,
+          "eval_tps": 62.99,
+          "total_s": 8.64,
+          "done_reason": "stop"
+        },
+        {
+          "id": "think_puzzle",
+          "category": "think",
+          "passed": true,
+          "note": "contains:9=True",
+          "loop": false,
+          "think_overflow": false,
+          "content_chars": 1,
+          "thinking_chars": 7,
+          "vram_mb_before": 15040,
+          "wall_s": 2.59,
+          "load_s": 0.02,
+          "prompt_tokens": 91,
+          "prefill_tps": 300.55,
+          "eval_tokens": 15,
+          "eval_tps": 67.08,
+          "total_s": 0.56,
+          "done_reason": "stop"
+        },
+        {
+          "id": "think_code",
+          "category": "think",
+          "passed": null,
+          "note": "",
+          "loop": false,
+          "think_overflow": false,
+          "content_chars": 902,
+          "thinking_chars": 1538,
+          "vram_mb_before": 15040,
+          "wall_s": 14.11,
+          "load_s": 0.01,
+          "prompt_tokens": 83,
+          "prefill_tps": 312.76,
+          "eval_tokens": 742,
+          "eval_tps": 62.95,
+          "total_s": 12.07,
+          "done_reason": "stop"
+        }
+      ],
+      "ps": {
+        "processor": null,
+        "size_vram_mb": 12805,
+        "size_mb": 12805,
+        "context": 16384
+      },
+      "vram_mb": 15040
+    }
+  },
+  "gpu_end_mb": 15040
+}

@@ -1,0 +1,52 @@
+{
+  "timestamp": "20261021_170358",
+  "model": "huihui_ai/gpt-oss-abliterated:20b",
+  "configs": {
+    "ctx4096-nothink": {
+      "tests": [
+        {
+          "id": "perf_short",
+          "category": "perf",
+          "passed": null,
+          "note": "",
+          "loop": false,
+          "output_chars": 0,
+          "vram_mb_before": 1159,
+          "wall_s": 7.03,
+          "load_s": 4.53,
+          "prompt_tokens": 69,
+          "prefill_tps": 319.94,
+          "eval_tokens": 16,
+          "eval_tps": 65.85,
+          "total_s": 4.99,
+          "done_reason": "length"
+        },
+        {
+          "id": "perf_code",
+          "category": "perf",
+          "passed": true,
+          "note": "py_syntax=True",
+          "loop": false,
+          "output_chars": 307,
+          "vram_mb_before": 13912,
+          "wall_s": 7.37,
+          "load_s": 0.01,
+          "prompt_tokens": 79,
+          "prefill_tps": 252.62,
+          "eval_tokens": 322,
+          "eval_tps": 64.23,
+          "total_s": 5.34,
+          "done_reason": "stop"
+        }
+      ],
+      "ps": {
+        "processor": null,
+        "size_vram_mb": 12793,
+        "size_mb": 12793,
+        "context": 4096
+      },
+      "vram_mb": 13909
+    }
+  },
+  "gpu_end_mb": 13909
+}
