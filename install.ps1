@@ -1,4 +1,4 @@
-# install.ps1 — agent-systems installer (bun-style)
+# install.ps1 - agent-systems installer (bun-style)
 # Remote:  powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 | iex"
 # Local:   .\install.ps1 [-Systems a,b] [-SkipModels] [-NoDeps]
 param(
@@ -17,7 +17,7 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
   try { $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/tags")[0].name } catch {}
   $ref = if ($tag) { "refs/tags/$tag" } else { 'master' }
   if (Test-Path $Dest) {
-    Write-Host "existing install at $Dest — clean reinstall ($ref)" -ForegroundColor Cyan
+    Write-Host "existing install at $Dest - clean reinstall ($ref)" -ForegroundColor Cyan
     Remove-Item "$Dest\*" -Recurse -Force
   } else {
     Write-Host "downloading $repo @ $ref -> $Dest" -ForegroundColor Cyan
@@ -44,11 +44,11 @@ $root = $PSScriptRoot
 function Ensure-Dep($cmd, $wingetId, $name) {
   if (Get-Command $cmd -ErrorAction SilentlyContinue) { return $true }
   if ($NoDeps) { Write-Error "$name missing (install $wingetId or drop -NoDeps)"; exit 1 }
-  Write-Host "  [dep] $name missing — winget install $wingetId" -ForegroundColor Yellow
+  Write-Host "  [dep] $name missing - winget install $wingetId" -ForegroundColor Yellow
   winget install --id $wingetId -e --accept-source-agreements --accept-package-agreements -h
   $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
   if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-    Write-Error "$name installed but not on PATH yet — open a new terminal and re-run"
+    Write-Error "$name installed but not on PATH yet - open a new terminal and re-run"
     exit 1
   }
 }
@@ -57,7 +57,7 @@ Ensure-Dep python 'Python.Python.3.11' 'Python'
 if (-not $SkipModels) { Ensure-Dep ollama 'Ollama.Ollama' 'Ollama' }
 if (-not (Get-Command opencode2 -ErrorAction SilentlyContinue)) {
   Ensure-Dep npm 'OpenJS.NodeJS.LTS' 'Node.js'
-  Write-Host "  [dep] opencode2 missing — npm i -g @opencode-ai/cli@next" -ForegroundColor Yellow
+  Write-Host "  [dep] opencode2 missing - npm i -g @opencode-ai/cli@next" -ForegroundColor Yellow
   npm i -g '@opencode-ai/cli@next'
 }
 $cfgDir = "$env:USERPROFILE\.config\opencode"
