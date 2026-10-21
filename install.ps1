@@ -10,6 +10,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+  Write-Error "Python 3.11+ required (used by agentsys CLI + tools). Install from python.org and re-run."
+  exit 1
+}
+if (-not (Get-Command ollama -ErrorAction SilentlyContinue) -and -not $SkipModels) {
+  Write-Error "Ollama required for model aliases. Install ollama.com or use -SkipModels."
+  exit 1
+}
 $cfgDir = "$env:USERPROFILE\.config\opencode"
 
 Write-Host "== agent-systems install ==" -ForegroundColor Cyan
