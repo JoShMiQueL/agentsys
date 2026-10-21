@@ -5,5 +5,5 @@ if ($userPath -split ';' -contains $bin) {
   Write-Host "agentsys already on PATH"
 } else {
   [Environment]::SetEnvironmentVariable('Path', "$userPath;$bin", 'User')
-  Write-Host "added $bin to user PATH - open a NEW terminal for `agentsys`"
+  Write-Host "added $bin to user PATH - open a NEW terminal for agentsys"
 }
