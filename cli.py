@@ -8,6 +8,7 @@ Commands:
   remove <name>...     uninstall a system (agents/permissions/plugins/defaults)
   sync                 re-apply every installed system (after git pull)
   doctor               verify environment: ollama, opencode2, models, config
+  version              installed version + update check
   status               live opencode.json vs installed systems
 """
 from __future__ import annotations
@@ -290,6 +291,16 @@ def cmd_update():
     cmd_sync()
 
 
+def cmd_version():
+    local = local_version() or "dev checkout"
+    remote = remote_tag()
+    print(f"agentsys {local}")
+    if remote and _ver(remote) > _ver(local):
+        print(f"update available: {local} -> {remote} - run: agentsys update")
+    elif remote and local == remote:
+        print("up to date")
+
+
 def notice_update():
     """Cached (1h) 'update available' nudge appended after any command."""
     try:
@@ -383,6 +394,8 @@ def _dispatch(cmd: str, rest: list) -> int:
         cmd_status(); return 0
     if cmd == "update":
         cmd_update(); return 0
+    if cmd == "version":
+        cmd_version(); return 0
     if cmd == "doctor":
         cmd_doctor(); return 0
     print(USAGE)
