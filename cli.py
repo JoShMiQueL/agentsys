@@ -249,19 +249,15 @@ def cmd_update():
         print(f"up to date ({remote})")
         return
     print(f"update available: {local or '?'} -> {remote}")
-    if (ROOT / ".git").exists():
-        subprocess.run(["git", "-C", str(ROOT), "fetch", "--tags", "-f"], check=True)
-        subprocess.run(["git", "-C", str(ROOT), "checkout", remote], check=True)
-    else:
-        print("no git — applying tag archive...")
-        data = urllib.request.urlopen(urllib.request.Request(
-            f"https://github.com/{REPO}/archive/refs/tags/{remote}.zip",
-            headers={"User-Agent": "agentsys"}), timeout=60).read()
-        tmp = Path(tempfile.mkdtemp())
-        zipfile.ZipFile(io.BytesIO(data)).extractall(tmp)
-        src = next(tmp.iterdir())
-        shutil.copytree(src, ROOT, dirs_exist_ok=True)
-        shutil.rmtree(tmp, ignore_errors=True)
+    print("applying tag archive...")
+    data = urllib.request.urlopen(urllib.request.Request(
+        f"https://github.com/{REPO}/archive/refs/tags/{remote}.zip",
+        headers={"User-Agent": "agentsys"}), timeout=60).read()
+    tmp = Path(tempfile.mkdtemp())
+    zipfile.ZipFile(io.BytesIO(data)).extractall(tmp)
+    src = next(tmp.iterdir())
+    shutil.copytree(src, ROOT, dirs_exist_ok=True)
+    shutil.rmtree(tmp, ignore_errors=True)
     (ROOT / "VERSION").write_text(remote + "\n")
     print("re-applying installed systems...")
     cmd_sync()

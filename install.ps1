@@ -13,26 +13,21 @@ $ErrorActionPreference = 'Stop'
 # --- bootstrap: running via irm (no local repo) -> fetch repo, re-run self ---
 if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems'))) {
   $repo = 'JoShMiQueL/agentsys'
-  if (Test-Path "$Dest\.git") {
-    Write-Host "existing install at $Dest — git pull" -ForegroundColor Cyan
-    git -C $Dest pull --ff-only
-  } elseif (Get-Command git -ErrorAction SilentlyContinue) {
-    Write-Host "cloning $repo -> $Dest" -ForegroundColor Cyan
-    git clone --depth 1 "https://github.com/$repo.git" $Dest
-    git -C $Dest fetch --tags -f 2>$null
+  $tag = $null
+  try { $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/tags")[0].name } catch {}
+  $ref = if ($tag) { "refs/tags/$tag" } else { 'master' }
+  if (Test-Path $Dest) {
+    Write-Host "existing install at $Dest — overlaying latest ($ref)" -ForegroundColor Cyan
   } else {
-    Write-Host "downloading $repo -> $Dest (no git; snapshots can't git-update)" -ForegroundColor Cyan
-    $zip = "$env:TEMP\agentsys.zip"
-    Invoke-WebRequest "https://github.com/$repo/archive/refs/heads/master.zip" -OutFile $zip
-    Expand-Archive $zip "$env:TEMP\agentsys-x" -Force
-    Move-Item "$env:TEMP\agentsys-x\agentsys-master" $Dest -Force
-    Remove-Item $zip, "$env:TEMP\agentsys-x" -Recurse -Force
+    Write-Host "downloading $repo @ $ref -> $Dest" -ForegroundColor Cyan
   }
-  # stamp installed version (latest tag)
-  try {
-    $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/tags")[0].name
-    if ($tag) { Set-Content "$Dest\VERSION" $tag }
-  } catch {}
+  $zip = "$env:TEMP\agentsys.zip"
+  Invoke-WebRequest "https://github.com/$repo/archive/$ref.zip" -OutFile $zip
+  Expand-Archive $zip "$env:TEMP\agentsys-x" -Force
+  $src = (Get-ChildItem "$env:TEMP\agentsys-x" -Directory | Select-Object -First 1).FullName
+  Copy-Item "$src\*" $Dest -Recurse -Force
+  Remove-Item $zip, "$env:TEMP\agentsys-x" -Recurse -Force
+  if ($tag) { Set-Content "$Dest\VERSION" $tag }
   $args2 = @("-Systems", ($Systems -join ','))
   if ($SkipModels) { $args2 += '-SkipModels' }
   if ($NoDeps) { $args2 += '-NoDeps' }
