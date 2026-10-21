@@ -405,6 +405,7 @@ def _dispatch(cmd: str, rest: list) -> int:
 def main() -> int:
     args = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
+        print(f"agentsys {local_version() or 'dev checkout'}")
         print(USAGE)
         notice_update()   # post-hook: runs on EVERY command path
         return 0
