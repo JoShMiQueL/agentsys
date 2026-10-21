@@ -2,9 +2,11 @@
 # Remote:  powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 | iex"
 # Local:   .\install.ps1 [-Systems a,b] [-SkipModels] [-NoDeps]
 param(
-  [string[]]$Systems = @('reversing'),
+  [string[]]$Systems = @(),
   [switch]$SkipModels,
   [switch]$NoDeps,
+  [switch]$All,
+  [switch]$NonInteractive,
   [string]$Dest = "$env:USERPROFILE\.agentsys"
 )
 
@@ -31,11 +33,16 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
   Copy-Item "$src\*" $Dest -Recurse -Force
   Remove-Item $zip, "$env:TEMP\agentsys-x" -Recurse -Force
   if ($tag) { Set-Content "$Dest\VERSION" $tag }
-  $args2 = @("-Systems", ($Systems -join ','))
+  $args2 = @()
+  if ($Systems.Count) { $args2 += @('-Systems', ($Systems -join ',')) }
   if ($SkipModels) { $args2 += '-SkipModels' }
   if ($NoDeps) { $args2 += '-NoDeps' }
-  powershell -ExecutionPolicy Bypass -File "$Dest\install.ps1" @args2
-  powershell -ExecutionPolicy Bypass -File "$Dest\register-cli.ps1"
+  if ($All) { $args2 += '-All' }
+  if ($NonInteractive) { $args2 += '-NonInteractive' }
+  $psExe = 'powershell'
+  if (Get-Command pwsh -ErrorAction SilentlyContinue) { $psExe = 'pwsh' }
+  & $psExe -ExecutionPolicy Bypass -File "$Dest\install.ps1" @args2
+  & $psExe -ExecutionPolicy Bypass -File "$Dest\register-cli.ps1"
   Write-Host "`nDone. Open a new terminal: agentsys doctor" -ForegroundColor Green
   exit 0
 }
@@ -64,6 +71,25 @@ if (-not (Get-Command opencode2 -ErrorAction SilentlyContinue)) {
 $cfgDir = "$env:USERPROFILE\.config\opencode"
 
 Write-Host "== agent-systems install ==" -ForegroundColor Cyan
+
+# --- system selection ---
+$avail = @(Get-ChildItem (Join-Path $root 'systems') -Directory | Select-Object -Expand Name)
+if ($All) { $Systems = $avail }
+elseif (-not $Systems -or $Systems.Count -eq 0) {
+  if ($NonInteractive) {
+    $Systems = @('reversing')
+  } else {
+    Write-Host "Available systems:"
+    $map = @{}
+    $i = 0
+    foreach ($s in $avail) { $i++; $map[[string]$i] = $s; Write-Host "  $i) $s" }
+    $pick = Read-Host "Select (e.g. 1,2 or 'all') [all]"
+    if (-not $pick -or $pick -match '^(all|a)$') { $Systems = $avail }
+    else { $Systems = @($pick -split ',' | ForEach-Object { $map[$_.Trim()] } | Where-Object { $_ }) }
+  }
+}
+$Systems = @($Systems | Where-Object { $avail -contains $_ })
+if (-not $Systems.Count) { Write-Error "no valid systems selected"; exit 1 }
 
 $frags = @()
 foreach ($sys in $Systems) {
