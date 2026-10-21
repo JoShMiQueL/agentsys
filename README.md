@@ -12,10 +12,11 @@ git clone <repo>; cd agent-systems
 .\install.ps1 -Systems devin -SkipModels
 ```
 
-Requiere: Ollama, Python 3.11+, opencode2 (`npm i -g @opencode-ai/cli@next`).
-`install.ps1` crea aliases de Ollama declarados en `models.json` y mergea
-`system.json` en `~/.config/opencode/opencode.json` (idempotente, backup
-automático `opencode.json.bak-<ts>.json`).
+Fully automatic: missing deps (Python 3.11, Ollama, Node/opencode2) are
+installed via `winget`/`npm`. Use `-NoDeps` to fail instead of auto-installing.
+`install.ps1` creates Ollama aliases declared in `models.json` and merges
+`system.json` into `~/.config/opencode/opencode.json` (idempotent, auto-backup
+`opencode.json.bak-<ts>.json`).
 
 ## Sistemas incluidos
 

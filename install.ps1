@@ -5,19 +5,31 @@
 #   .\install.ps1 -Systems devin -SkipModels
 param(
   [string[]]$Systems = @('reversing'),
-  [switch]$SkipModels
+  [switch]$SkipModels,
+  [switch]$NoDeps
 )
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
-  Write-Error "Python 3.11+ required (used by agentsys CLI + tools). Install from python.org and re-run."
-  exit 1
+function Ensure-Dep($cmd, $wingetId, $name) {
+  if (Get-Command $cmd -ErrorAction SilentlyContinue) { return $true }
+  if ($NoDeps) { Write-Error "$name missing (install $wingetId or drop -NoDeps)"; exit 1 }
+  Write-Host "  [dep] $name missing — winget install $wingetId" -ForegroundColor Yellow
+  winget install --id $wingetId -e --accept-source-agreements --accept-package-agreements -h
+  $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+  if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
+    Write-Error "$name installed but not on PATH yet — open a new terminal and re-run"
+    exit 1
+  }
 }
-if (-not (Get-Command ollama -ErrorAction SilentlyContinue) -and -not $SkipModels) {
-  Write-Error "Ollama required for model aliases. Install ollama.com or use -SkipModels."
-  exit 1
+
+Ensure-Dep python 'Python.Python.3.11' 'Python'
+if (-not $SkipModels) { Ensure-Dep ollama 'Ollama.Ollama' 'Ollama' }
+if (-not (Get-Command opencode2 -ErrorAction SilentlyContinue)) {
+  Ensure-Dep npm 'OpenJS.NodeJS.LTS' 'Node.js'
+  Write-Host "  [dep] opencode2 missing — npm i -g @opencode-ai/cli@next" -ForegroundColor Yellow
+  npm i -g '@opencode-ai/cli@next'
 }
 $cfgDir = "$env:USERPROFILE\.config\opencode"
 
