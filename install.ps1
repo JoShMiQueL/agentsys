@@ -79,13 +79,30 @@ elseif (-not $Systems -or $Systems.Count -eq 0) {
   if ($NonInteractive) {
     $Systems = @('reversing')
   } else {
-    Write-Host "Available systems:"
-    $map = @{}
-    $i = 0
-    foreach ($s in $avail) { $i++; $map[[string]$i] = $s; Write-Host "  $i) $s" }
-    $pick = Read-Host "Select (e.g. 1,2 or 'all') [all]"
-    if (-not $pick -or $pick -match '^(all|a)$') { $Systems = $avail }
-    else { $Systems = @($pick -split ',' | ForEach-Object { $map[$_.Trim()] } | Where-Object { $_ }) }
+    # TUI: arrows move, space toggles, 'a' all, enter confirms, esc cancels
+    $sel = @($avail | ForEach-Object { $false })
+    $pos = 0
+    $maxw = ($avail | Measure-Object -Maximum { $_.Length }).Maximum
+    Write-Host "Select systems: up/down=move  space=toggle  a=all  enter=confirm (none=all)  esc=cancel"
+    foreach ($s in $avail) { Write-Host "    [ ] $($s.PadRight($maxw))" }
+    $lines = $avail.Count
+    :pick while ($true) {
+      $k = [Console]::ReadKey($true)
+      if ($k.Key -eq 'UpArrow')   { $pos = ($pos + $lines - 1) % $lines }
+      elseif ($k.Key -eq 'DownArrow') { $pos = ($pos + 1) % $lines }
+      elseif ($k.Key -eq 'Spacebar')  { $sel[$pos] = -not $sel[$pos] }
+      elseif ($k.KeyChar -eq 'a')     { $all = -not ($sel -notcontains $false); for ($j=0;$j -lt $lines;$j++) { $sel[$j]=$all } }
+      elseif ($k.Key -eq 'Enter')     { break pick }
+      elseif ($k.Key -eq 'Escape')    { Write-Host "cancelled"; exit 0 }
+      try { [Console]::SetCursorPosition(0, [Console]::CursorTop - $lines) } catch {}
+      for ($j = 0; $j -lt $lines; $j++) {
+        $mark = if ($sel[$j]) { '[x]' } else { '[ ]' }
+        $ptr  = if ($j -eq $pos) { '>' } else { ' ' }
+        Write-Host ("  {0} {1} {2}" -f $ptr, $mark, $avail[$j].PadRight($maxw))
+      }
+    }
+    if (-not ($sel -contains $true)) { $Systems = $avail }  # enter with none selected = all
+    else { $Systems = @($avail | Where-Object { $sel[$avail.IndexOf($_)] }) }
   }
 }
 $Systems = @($Systems | Where-Object { $avail -contains $_ })
