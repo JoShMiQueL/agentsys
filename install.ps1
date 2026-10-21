@@ -19,6 +19,7 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
   } elseif (Get-Command git -ErrorAction SilentlyContinue) {
     Write-Host "cloning $repo -> $Dest" -ForegroundColor Cyan
     git clone --depth 1 "https://github.com/$repo.git" $Dest
+    git -C $Dest fetch --tags -f 2>$null
   } else {
     Write-Host "downloading $repo -> $Dest (no git; snapshots can't git-update)" -ForegroundColor Cyan
     $zip = "$env:TEMP\agentsys.zip"
@@ -26,9 +27,12 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
     Expand-Archive $zip "$env:TEMP\agentsys-x" -Force
     Move-Item "$env:TEMP\agentsys-x\agentsys-master" $Dest -Force
     Remove-Item $zip, "$env:TEMP\agentsys-x" -Recurse -Force
-    $sha = (Invoke-RestMethod "https://api.github.com/repos/$repo/commits/master").sha
-    Set-Content "$Dest\COMMIT" $sha
   }
+  # stamp installed version (latest tag)
+  try {
+    $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/tags")[0].name
+    if ($tag) { Set-Content "$Dest\VERSION" $tag }
+  } catch {}
   $args2 = @("-Systems", ($Systems -join ','))
   if ($SkipModels) { $args2 += '-SkipModels' }
   if ($NoDeps) { $args2 += '-NoDeps' }

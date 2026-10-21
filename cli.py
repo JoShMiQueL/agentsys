@@ -217,42 +217,64 @@ def cmd_doctor():
 REPO = "JoShMiQueL/agentsys"
 
 
-def remote_sha() -> str | None:
+def remote_tag() -> str | None:
+    """Latest git tag on the repo (= newest release), or None."""
     try:
         req = urllib.request.Request(
-            f"https://api.github.com/repos/{REPO}/commits/master",
+            f"https://api.github.com/repos/{REPO}/tags",
             headers={"User-Agent": "agentsys"})
-        return json.load(urllib.request.urlopen(req, timeout=10))["sha"]
+        tags = json.load(urllib.request.urlopen(req, timeout=10))
+        return tags[0]["name"] if tags else None
     except Exception:
         return None
 
 
-def local_sha() -> str | None:
-    if (ROOT / ".git").exists():
-        r = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
-                           capture_output=True, text=True)
-        return r.stdout.strip() or None
-    f = ROOT / "COMMIT"
-    return f.read_text().strip() if f.exists() else None
+def local_version() -> str | None:
+    f = ROOT / "VERSION"
+    if f.exists():
+        return f.read_text().strip()
+    return None
 
 
 def cmd_update():
-    remote = remote_sha()
+    remote = remote_tag()
     if not remote:
         print("cannot reach github — check connectivity")
         return
-    local = local_sha()
+    local = local_version()
     if local == remote:
-        print(f"up to date ({remote[:8]})")
+        print(f"up to date ({remote})")
         return
-    print(f"update available: {(local or '?')[:8]} -> {remote[:8]}")
+    print(f"update available: {local or '?'} -> {remote}")
     if (ROOT / ".git").exists():
-        subprocess.run(["git", "-C", str(ROOT), "pull", "--ff-only"], check=True)
+        subprocess.run(["git", "-C", str(ROOT), "fetch", "--tags", "-f"], check=True)
+        subprocess.run(["git", "-C", str(ROOT), "checkout", remote], check=True)
     else:
-        print("zip install (no .git) — re-run the irm install command to update code")
+        print("zip install (no .git) — re-run the irm install command to update")
         return
+    (ROOT / "VERSION").write_text(remote + "\n")
     print("re-applying installed systems...")
     cmd_sync()
+
+
+def notice_update():
+    """Cached (24h) 'update available' nudge appended after any command."""
+    try:
+        st = load_json(STATE, {"installed": {}})
+        cache = st.get("update_check") or {}
+        now = datetime.now().timestamp()
+        if now - cache.get("at", 0) > 86400:
+            t = remote_tag()
+            if t:
+                cache = {"at": now, "latest": t}
+                st["update_check"] = cache
+                save_json(STATE, st)
+        latest = cache.get("latest")
+        local = local_version()
+        if latest and local and latest != local:
+            print(f"\n[agentsys] new version {latest} (you have {local}) — run: agentsys update")
+    except Exception:
+        pass
 
 
 USAGE = __doc__
@@ -264,22 +286,27 @@ def main() -> int:
         print(USAGE)
         return 0
     cmd, rest = args[0], args[1:]
+    rc = 0
     if cmd == "install":
-        return 0 if all(install(n) for n in rest) else 1
-    if cmd == "remove":
-        return 0 if all(remove(n) for n in rest) else 1
-    if cmd == "list":
-        cmd_list(); return 0
-    if cmd == "sync":
-        cmd_sync(); return 0
-    if cmd == "status":
-        cmd_status(); return 0
-    if cmd == "update":
-        cmd_update(); return 0
-    if cmd == "doctor":
-        cmd_doctor(); return 0
-    print(USAGE)
-    return 2
+        rc = 0 if all(install(n) for n in rest) else 1
+    elif cmd == "remove":
+        rc = 0 if all(remove(n) for n in rest) else 1
+    elif cmd == "list":
+        cmd_list()
+    elif cmd == "sync":
+        cmd_sync()
+    elif cmd == "status":
+        cmd_status()
+    elif cmd == "update":
+        cmd_update()
+    elif cmd == "doctor":
+        cmd_doctor()
+    else:
+        print(USAGE)
+        rc = 2
+    if cmd != "update":
+        notice_update()
+    return rc
 
 
 if __name__ == "__main__":
