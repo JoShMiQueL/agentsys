@@ -15,7 +15,8 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
   $repo = 'JoShMiQueL/agentsys'
   $tag = $null
   try { $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/tags")[0].name } catch {}
-  $ref = if ($tag) { "refs/tags/$tag" } else { 'master' }
+  $ref = 'master'
+  if ($tag) { $ref = "refs/tags/$tag" }
   if (Test-Path $Dest) {
     Write-Host "existing install at $Dest - clean reinstall ($ref)" -ForegroundColor Cyan
     Remove-Item "$Dest\*" -Recurse -Force
