@@ -1,4 +1,4 @@
-# agent-systems — installable agent collections for OpenCode 2
+# agentsys — installable agent collections for OpenCode 2
 
 Multiple systems coexist safely: each is a named set of agents merged into
 `~/.config/opencode/opencode.json`. No collisions — agents are namespaced

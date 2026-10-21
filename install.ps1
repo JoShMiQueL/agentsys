@@ -1,5 +1,5 @@
 # install.ps1 — agent-systems installer (bun-style)
-# Remote:  powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agent-systems/master/install.ps1 | iex"
+# Remote:  powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 | iex"
 # Local:   .\install.ps1 [-Systems a,b] [-SkipModels] [-NoDeps]
 param(
   [string[]]$Systems = @('reversing'),
@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 
 # --- bootstrap: running via irm (no local repo) -> fetch repo, re-run self ---
 if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems'))) {
-  $repo = 'JoShMiQueL/agent-systems'
+  $repo = 'JoShMiQueL/agentsys'
   if (Test-Path "$Dest\.git") {
     Write-Host "existing install at $Dest — git pull" -ForegroundColor Cyan
     git -C $Dest pull --ff-only
@@ -21,7 +21,7 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
     $zip = "$env:TEMP\agentsys.zip"
     Invoke-WebRequest "https://github.com/$repo/archive/refs/heads/master.zip" -OutFile $zip
     Expand-Archive $zip "$env:TEMP\agentsys-x" -Force
-    Move-Item "$env:TEMP\agentsys-x\agent-systems-master" $Dest -Force
+    Move-Item "$env:TEMP\agentsys-x\agentsys-master" $Dest -Force
     Remove-Item $zip, "$env:TEMP\agentsys-x" -Recurse -Force
   }
   $args2 = @("-Systems", ($Systems -join ','))

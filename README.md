@@ -1,4 +1,4 @@
-# agent-systems — colección instalable de sistemas de agentes para OpenCode 2
+# agentsys — colección instalable de sistemas de agentes para OpenCode 2
 
 Cada carpeta en `systems/` es un sistema completo e instalable con un comando.
 Añadir uno nuevo = crear `systems/<nombre>/system.json` (+ `models.json` opcional).
@@ -7,7 +7,7 @@ Añadir uno nuevo = crear `systems/<nombre>/system.json` (+ `models.json` opcion
 
 ```powershell
 # bun-style, no clone needed — installs everything:
-powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agent-systems/master/install.ps1 | iex"
+powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 | iex"
 
 # or locally after clone:
 .\install.ps1 -Systems reversing,devin [-SkipModels] [-NoDeps]
