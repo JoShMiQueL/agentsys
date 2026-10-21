@@ -1,44 +1,39 @@
-# Agent environment — oblitebenchs
+# agent-systems — installable agent collections for OpenCode 2
 
-Reproducible agentic setup for OpenCode 2 + local Ollama models, focused on
-reverse engineering. Read `context/` for memory and decisions before changing things.
+Multiple systems coexist safely: each is a named set of agents merged into
+`~/.config/opencode/opencode.json`. No collisions — agents are namespaced
+(`re`/`explorer`/`coder`/`analyst`/`deep` vs `gen`/`dexplore`/`dcoder`/`danalyst`)
+and each primary knows its own roster by exact name.
+
+Read `context/` for persistent memory before changing anything.
 
 ## Layout
 
-- tools/bench/ — multi-model benchmark suite
-- `install.ps1` — idempotent installer (models + config merge)
-- `merge_config.py` — deep-merges JSON fragments into `~/.config/opencode/opencode.json`
-- `systems/reversing/` — local-model agent system (orq/explorer/coder/analyst/deep + models)
-- `systems/devin/` — optional Devin cloud system (dorq/dexplore/dcoder/danalyst + plugin)
-- `merge_config.py` — deep-merges system.json fragments into opencode.json
-- `dump_db.py`, `dump_msgs.py`, `dump_latest.py`, `dump_session.py` — opencode session DB inspection
-- `schema_probe.py`, `schema_perm.py` — fetch live opencode config schema
-- `context/` — persistent memory (see below)
+- `systems/<name>/system.json` — config fragment (agents/providers/permissions/defaults)
+- `systems/<name>/models.json` + `models/` — Ollama aliases required (optional)
+- `install.ps1` — idempotent installer (`-Systems a,b`, `-SkipModels`)
+- `merge_config.py` — deep-merge with auto-backup of opencode.json
+- `tools/bench/` — Ollama multi-model benchmark suite
+- `tools/opencode-debug/` — session DB inspection + config schema probes
+- `context/` — project memory (models.md, gotchas.md, decisions.md)
 
-## Install / update
+## Install / sync
 
 ```powershell
 git pull
-.\install.ps1                              # reversing system
-.\install.ps1 -Systems reversing,devin     # both systems
+.\install.ps1                          # reversing system (default)
+.\install.ps1 -Systems reversing,devin # several systems side by side
 .\install.ps1 -SkipModels
 ```
 
-The installer backs up `opencode.json` to `opencode.json.bak-<ts>.json` before every merge. Merges are idempotent — safe to re-run.
+Top-level defaults (`model`, `default_agent`) are last-write-wins across
+systems; each primary agent still carries its own model. Switch systems by
+choosing the agent (`/agent re` or `opencode2 run --agent re`).
 
-## Context / memory
+## Hard-won rules (details in context/gotchas.md)
 
-- `context/models.md` — what each model is for and its quirks (read before picking)
-- `context/gotchas.md` — failure modes discovered and their fixes
-- `context/decisions.md` — architectural decisions and why
-
-When a session uncovers a new quirk or a config change, update these files — they
-are the project's memory across reinstalls and machines.
-
-## Gotchas (top hits, details in context/gotchas.md)
-
-- Out-of-workspace file access hangs headless sessions (fixed via `permissions`)
-- v2 config uses `agents`+`system` (not deprecated `agent`/`prompt`)
-- gpt-oss needs `think:"low"` (think:false does not disable thinking in this build)
-- Agent names must be plain English (models hallucinate translations)
+- v2 schema: `agents`+`system`+`model` (deprecated `agent`/`prompt` are ignored)
+- gpt-oss-abliterated requires `think:"low"`; `think:false` does not disable thinking
+- Headless hangs come from out-of-workspace permission prompts — fixed via `permissions`
+- Agent names stay English; models hallucinate translated names
 - REA is driven via bash `npx rea-agents <cmd>`, NOT MCP (~249K-token catalog)

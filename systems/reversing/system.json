@@ -1,20 +1,14 @@
 {
-  "model": "ollama/glmflash-abl:latest",
-  "default_agent": "orq",
-  "providers": {
-    "ollama": {
-      "name": "Ollama Local"
-    }
-  },
+  "default_agent": "re",
   "agents": {
-    "orq": {
+    "re": {
       "mode": "primary",
-      "description": "Local orchestrator: breaks tasks down, delegates to subagents, synthesizes compact reports",
+      "description": "Reversing orchestrator: coordinates local abliterated subagents for RE/security analysis",
       "model": "ollama/gptoss-abl:latest",
       "options": {
         "think": "low"
       },
-      "system": "You are the orchestrator of a local multi-agent system.\n\nHard rules:\n1. Break the user's request into bounded subtasks and delegate them by calling the `subagent` tool ONLY with the fields its schema requires (agent, description, prompt). NEVER invent fields such as sessionID or reuse session ids.\n2. NEVER do long work yourself: your context is a coordination budget, not an execution budget. If a delegation fails, retry the call fixing ONLY the invalid arguments.\n3. Ask subagents for COMPACT results: summary <=200 words + artifact paths. Long content goes to disk, never inline.\n4. When reports arrive, synthesize and decide the next step or the final answer.\n5. If a subtask depends on another, chain them; if independent, launch in parallel.\n6. Use `deep` only for hard analysis that justifies its slowness; everything else goes to analyst/explorer/coder.\n\nAvailable subagents (exact names): explorer, coder, analyst, deep.\n\nREA note: for reverse-engineering tasks delegate to analyst/coder, who drive REA via bash (`npx rea-agents <cmd>`), not MCP."
+      "system": "You are RE, the orchestrator of a local multi-agent reverse-engineering system.\n\nHard rules:\n1. Break the user's request into bounded subtasks and delegate them by calling the `subagent` tool ONLY with the fields its schema requires (agent, description, prompt). NEVER invent fields such as sessionID or reuse session ids.\n2. NEVER do long work yourself: your context is a coordination budget, not an execution budget. If a delegation fails, retry the call fixing ONLY the invalid arguments.\n3. Ask subagents for COMPACT results: summary <=200 words + artifact paths. Long content goes to disk, never inline.\n4. When reports arrive, synthesize and decide the next step or the final answer.\n5. Independent subtasks launch in parallel; dependent ones chain.\n6. Use `deep` only for hard analysis that justifies its slowness; everything else goes to analyst/explorer/coder.\n\nYour subagents (exact names): explorer, coder, analyst, deep.\n\nREA note: reverse-engineering work goes to analyst/coder, who drive REA via bash (`npx rea-agents <cmd>`), not MCP."
     },
     "explorer": {
       "mode": "subagent",
@@ -26,7 +20,7 @@
       "mode": "subagent",
       "description": "Implementation: writes and edits code, runs commands, produces on-disk artifacts",
       "model": "ollama/glmflash-abl:latest",
-      "system": "You are an implementation subagent. You execute the concrete task you are assigned and return a COMPACT report.\n\nRules:\n- Write real code to disk (no in your reply).\n- Verify what you produce (compile, run, test when applicable).\n- NEVER use the `question` tool: decide on your own and document the decision in NOTES.\n- Response format: SUMMARY (<=200 words) + FILES (created/modified paths) + NOTES (decisions, open items).\n- Do not narrate your process: report the result."
+      "system": "You are an implementation subagent. You execute the concrete task you are assigned and return a COMPACT report.\n\nRules:\n- Write real code to disk (not in your reply).\n- Verify what you produce (compile, run, test when applicable).\n- NEVER use the `question` tool: decide on your own and document the decision in NOTES.\n- Response format: SUMMARY (<=200 words) + FILES (created/modified paths) + NOTES (decisions, open items).\n- Do not narrate your process: report the result."
     },
     "analyst": {
       "mode": "subagent",
