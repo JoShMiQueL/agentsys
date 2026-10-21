@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -294,7 +295,10 @@ def notice_update():
         latest = cache.get("latest")
         local = local_version()
         if latest and local and latest != local:
-            print(f"\n[agentsys] new version {latest} (you have {local}) — run: agentsys update")
+            if sys.platform == "win32":
+                os.system("")  # enable ANSI on Windows console
+            print(f"\n\033[33m[agentsys] new version {latest} (you have {local})"
+                  f" - run: agentsys update\033[0m")
     except Exception:
         pass
 
@@ -354,32 +358,35 @@ def cmd_uninstall():
 USAGE = __doc__
 
 
+def _dispatch(cmd: str, rest: list) -> int:
+    if cmd == "install":
+        return 0 if all(install(n) for n in rest) else 1
+    if cmd == "remove":
+        return 0 if all(remove(n) for n in rest) else 1
+    if cmd == "uninstall":
+        cmd_uninstall(); return 0
+    if cmd == "list":
+        cmd_list(); return 0
+    if cmd == "sync":
+        cmd_sync(); return 0
+    if cmd == "status":
+        cmd_status(); return 0
+    if cmd == "update":
+        cmd_update(); return 0
+    if cmd == "doctor":
+        cmd_doctor(); return 0
+    print(USAGE)
+    return 2
+
+
 def main() -> int:
     args = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
         print(USAGE)
+        notice_update()   # post-hook: runs on EVERY command path
         return 0
     cmd, rest = args[0], args[1:]
-    rc = 0
-    if cmd == "install":
-        rc = 0 if all(install(n) for n in rest) else 1
-    elif cmd == "remove":
-        rc = 0 if all(remove(n) for n in rest) else 1
-    elif cmd == "list":
-        cmd_list()
-    elif cmd == "sync":
-        cmd_sync()
-    elif cmd == "status":
-        cmd_status()
-    elif cmd == "update":
-        cmd_update()
-    elif cmd == "uninstall":
-        cmd_uninstall()
-    elif cmd == "doctor":
-        cmd_doctor()
-    else:
-        print(USAGE)
-        rc = 2
+    rc = _dispatch(cmd, rest)
     if cmd != "update":
         notice_update()
     return rc
