@@ -1,2 +1,0 @@
-FROM huihui_ai/gpt-oss-abliterated:20b
-PARAMETER num_ctx 16384

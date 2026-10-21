@@ -1,4 +1,4 @@
 sandbox/
 __pycache__/
 *.pyc
-results/*/out_*.txt
+tools/bench/results/*/out_*.txt

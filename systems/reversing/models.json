@@ -1,0 +1,19 @@
+{
+  "models": [
+    {
+      "alias": "glmflash-abl",
+      "file": "Modelfile.glmflash",
+      "pull": "huihui_ai/glm-4.7-flash-abliterated:q4_K_S"
+    },
+    {
+      "alias": "gptoss-abl",
+      "file": "Modelfile.gptoss",
+      "pull": "huihui_ai/gpt-oss-abliterated:20b"
+    },
+    {
+      "alias": "qwen38-abl",
+      "file": "Modelfile.qwen38",
+      "pull": "huihui_ai/Qwen3.8-abliterated:27b"
+    }
+  ]
+}

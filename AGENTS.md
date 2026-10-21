@@ -5,12 +5,12 @@ reverse engineering. Read `context/` for memory and decisions before changing th
 
 ## Layout
 
-- `bench.py`, `compare.py`, `prompts.json` — multi-model benchmark suite (Ollama API)
+- tools/bench/ — multi-model benchmark suite
 - `install.ps1` — idempotent installer (models + config merge)
 - `merge_config.py` — deep-merges JSON fragments into `~/.config/opencode/opencode.json`
-- `config/profile_reversing.json` — local-model agent roster (orq/explorer/coder/analyst/deep)
-- `config/profile_devin.json` — optional Devin cloud agents (dorq/dexplore/dcoder/danalyst) + `opencode-devin` plugin
-- `config/Modelfile.*` — Ollama aliases with baked `num_ctx`
+- `systems/reversing/` — local-model agent system (orq/explorer/coder/analyst/deep + models)
+- `systems/devin/` — optional Devin cloud system (dorq/dexplore/dcoder/danalyst + plugin)
+- `merge_config.py` — deep-merges system.json fragments into opencode.json
 - `dump_db.py`, `dump_msgs.py`, `dump_latest.py`, `dump_session.py` — opencode session DB inspection
 - `schema_probe.py`, `schema_perm.py` — fetch live opencode config schema
 - `context/` — persistent memory (see below)
@@ -19,8 +19,8 @@ reverse engineering. Read `context/` for memory and decisions before changing th
 
 ```powershell
 git pull
-.\install.ps1            # models + reversing profile
-.\install.ps1 -Devin     # additionally: devin plugin + cloud agents
+.\install.ps1                              # reversing system
+.\install.ps1 -Systems reversing,devin     # both systems
 .\install.ps1 -SkipModels
 ```
 

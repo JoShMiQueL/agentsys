@@ -1,52 +1,44 @@
-# oblitebenchs — reproducible agent env for OpenCode 2 + Ollama
+# agent-systems — colección instalable de sistemas de agentes para OpenCode 2
 
-Agentic reversing setup: local abliterated models + orchestrated subagents,
-packaged for one-command reinstall on any machine.
+Cada carpeta en `systems/` es un sistema completo e instalable con un comando.
+Añadir uno nuevo = crear `systems/<nombre>/system.json` (+ `models.json` opcional).
 
 ## Install
 
 ```powershell
-git clone <repo> oblitebenchs; cd oblitebenchs
-.\install.ps1            # ollama aliases + reversing profile
-.\install.ps1 -Devin     # + devin plugin (swe-2-* cloud agents)
-.\install.ps1 -SkipModels
+git clone <repo>; cd agent-systems
+.\install.ps1                          # sistema 'reversing' (default)
+.\install.ps1 -Systems reversing,devin # varios a la vez
+.\install.ps1 -Systems devin -SkipModels
 ```
 
-Requires: Ollama, Python 3.11+, opencode2 (`npm i -g @opencode-ai/cli@next`).
+Requiere: Ollama, Python 3.11+, opencode2 (`npm i -g @opencode-ai/cli@next`).
+`install.ps1` crea aliases de Ollama declarados en `models.json` y mergea
+`system.json` en `~/.config/opencode/opencode.json` (idempotente, backup
+automático `opencode.json.bak-<ts>.json`).
 
-## What it installs
+## Sistemas incluidos
 
-**Ollama aliases** (baked `num_ctx`, zero extra disk):
-`glmflash-abl` (16k), `gptoss-abl` (16k), `qwen38-abl` (8k)
-
-**Agents** merged into `~/.config/opencode/opencode.json` (idempotent, auto-backup):
-
-| reversing (local) | devin (cloud, optional) | role |
+| sistema | modelos | agentes |
 |---|---|---|
-| orq | dorq | primary orchestrator |
-| explorer | dexplore | read-only research |
-| coder | dcoder | implementation |
-| analyst | danalyst | technical/RE analysis |
-| deep | — | 27B escalation |
+| `reversing` | glmflash-abl, gptoss-abl, qwen38-abl (Ollama locales) | orq, explorer, coder, analyst, deep |
+| `devin` | swe-2-* cloud (plugin `opencode-devin`) | dorq, dexplore, dcoder, danalyst |
 
-Plus permissive `permissions` ruleset (no headless hangs) and `compaction.auto`.
+## Anatomía de un sistema
 
-## Benchmark suite
-
-```powershell
-python bench.py --phase all --model <m>   # perf/quality/think/scaling
-python compare.py                         # -> results/COMPARE.md
+```
+systems/<nombre>/
+  system.json     # fragmento opencode: agents/providers/permissions/compaction/plugins
+  models.json     # [{alias, file, pull}] — modelos Ollama requeridos (opcional)
+  models/         # Modelfiles referenciados (opcional)
 ```
 
-## Memory
+## Tools
 
-`AGENTS.md` (index, read by opencode+devin) → `context/models.md`,
-`context/gotchas.md`, `context/decisions.md`. Update after discoveries —
-this is the project's persistent memory.
+- `tools/bench/` — suite de benchmarks Ollama multi-modelo (`bench.py`, `compare.py`, resultados)
+- `tools/opencode-debug/` — inspección de sesiones DB y schema probing
 
-## Design notes
+## Memoria persistente
 
-- REA driven via bash `npx rea-agents <cmd>`, not MCP (249K-token catalog)
-- One resident model, N logical agents — weights shared, contexts separate
-- Artifact-first: workers write to disk, report compact paths
-- See `context/decisions.md` for the full reasoning
+`AGENTS.md` en raíz (leído por opencode y devin) → `context/`:
+`models.md`, `gotchas.md`, `decisions.md`. Actualizar tras cada descubrimiento.

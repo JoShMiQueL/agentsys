@@ -1,2 +1,0 @@
-FROM huihui_ai/Qwen3.8-abliterated:27b
-PARAMETER num_ctx 8192

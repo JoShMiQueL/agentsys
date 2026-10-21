@@ -1,2 +1,0 @@
-FROM huihui_ai/glm-4.7-flash-abliterated:q4_K_S
-PARAMETER num_ctx 16384
