@@ -299,6 +299,58 @@ def notice_update():
         pass
 
 
+INSTALL_DIR = Path.home() / ".agentsys"
+
+
+def _unpath():
+    """Remove INSTALL_DIR/bin from PATH (winreg on Windows, rc files on unix)."""
+    b = str(INSTALL_DIR / "bin").lower()
+    if sys.platform == "win32":
+        try:
+            import winreg
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0,
+                                 winreg.KEY_ALL_ACCESS)
+            path = winreg.QueryValueEx(key, "Path")[0]
+            keep = [p for p in path.split(";") if p and b not in p.lower()]
+            winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, ";".join(keep))
+            winreg.CloseKey(key)
+        except Exception:
+            pass
+    else:
+        for rc in [Path.home() / f for f in (".bashrc", ".zshrc", ".profile")]:
+            if rc.exists():
+                lines = [l for l in rc.read_text().splitlines()
+                         if ".agentsys/bin" not in l]
+                rc.write_text("\n".join(lines) + "\n")
+
+
+def cmd_uninstall():
+    """Remove every installed system + CLI itself. Ollama models untouched."""
+    cfg = load_json(CFG, {})
+    cfg_agents = cfg.get("agents") or {}
+    names = set((load_json(STATE, {"installed": {}})["installed"]).keys())
+    # also detect systems whose agents are present but not state-tracked
+    for n in system_dirs():
+        frag = load_json(SYSTEMS / n / "system.json", {})
+        ags = (frag.get("agents") or {}).keys()
+        if ags and all(a in cfg_agents for a in ags):
+            names.add(n)
+    for name in names:
+        frag = SYSTEMS / name / "system.json"
+        if frag.exists():
+            cfg = unmerge(cfg, load_json(frag, {}))
+        print(f"  [unmerged] {name}")
+    backup()
+    save_json(CFG, cfg)
+    _unpath()
+    if STATE.exists():
+        STATE.unlink()
+    shutil.rmtree(INSTALL_DIR, ignore_errors=True)
+    if INSTALL_DIR.exists():
+        print(f"  [warn] could not fully remove {INSTALL_DIR} — delete manually")
+    print("uninstalled. Ollama models kept (remove manually: ollama rm <alias>)")
+
+
 USAGE = __doc__
 
 
@@ -321,6 +373,8 @@ def main() -> int:
         cmd_status()
     elif cmd == "update":
         cmd_update()
+    elif cmd == "uninstall":
+        cmd_uninstall()
     elif cmd == "doctor":
         cmd_doctor()
     else:
