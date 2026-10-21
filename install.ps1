@@ -70,7 +70,8 @@ if (-not (Get-Command opencode2 -ErrorAction SilentlyContinue)) {
 }
 $cfgDir = "$env:USERPROFILE\.config\opencode"
 
-Write-Host "== agent-systems install ==" -ForegroundColor Cyan
+Write-Host "`n== agentsys install ==" -ForegroundColor Cyan
+Write-Host "[1/4] checking dependencies..." -ForegroundColor DarkGray
 
 # --- system selection ---
 $avail = @(Get-ChildItem (Join-Path $root 'systems') -Directory | Select-Object -Expand Name)
@@ -111,6 +112,9 @@ elseif (-not $Systems -or $Systems.Count -eq 0) {
 $Systems = @($Systems | Where-Object { $avail -contains $_ })
 if (-not $Systems.Count) { Write-Error "no valid systems selected"; exit 1 }
 
+Write-Host "[2/4] selected: $($Systems -join ', ')" -ForegroundColor DarkGray
+Write-Host "[3/4] models + config merge..." -ForegroundColor DarkGray
+
 $frags = @()
 foreach ($sys in $Systems) {
   $sdir = Join-Path $root "systems\$sys"
@@ -137,6 +141,7 @@ foreach ($sys in $Systems) {
   if (Test-Path $frag) { $frags += $frag }
 }
 
+Write-Host "[4/4] merging into opencode.json..." -ForegroundColor DarkGray
 New-Item -ItemType Directory -Force $cfgDir | Out-Null
 if ($frags.Count) {
   python -X utf8 "$root\merge_config.py" --config "$cfgDir\opencode.json" @frags

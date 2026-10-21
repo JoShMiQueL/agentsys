@@ -52,6 +52,36 @@
   },
   "permissions": [
     {
+      "action": "bash",
+      "resource": "*rm -rf*",
+      "effect": "deny"
+    },
+    {
+      "action": "bash",
+      "resource": "*Remove-Item*-Recurse*-Force*",
+      "effect": "deny"
+    },
+    {
+      "action": "bash",
+      "resource": "*push*--force*",
+      "effect": "deny"
+    },
+    {
+      "action": "bash",
+      "resource": "*push*-f *",
+      "effect": "deny"
+    },
+    {
+      "action": "bash",
+      "resource": "*reset --hard*",
+      "effect": "deny"
+    },
+    {
+      "action": "bash",
+      "resource": "*clean -fd*",
+      "effect": "deny"
+    },
+    {
       "action": "external_directory",
       "resource": "*",
       "effect": "allow"
