@@ -12,11 +12,14 @@ Commands:
 """
 from __future__ import annotations
 
+import io
 import json
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -250,8 +253,15 @@ def cmd_update():
         subprocess.run(["git", "-C", str(ROOT), "fetch", "--tags", "-f"], check=True)
         subprocess.run(["git", "-C", str(ROOT), "checkout", remote], check=True)
     else:
-        print("zip install (no .git) — re-run the irm install command to update")
-        return
+        print("no git — applying tag archive...")
+        data = urllib.request.urlopen(urllib.request.Request(
+            f"https://github.com/{REPO}/archive/refs/tags/{remote}.zip",
+            headers={"User-Agent": "agentsys"}), timeout=60).read()
+        tmp = Path(tempfile.mkdtemp())
+        zipfile.ZipFile(io.BytesIO(data)).extractall(tmp)
+        src = next(tmp.iterdir())
+        shutil.copytree(src, ROOT, dirs_exist_ok=True)
+        shutil.rmtree(tmp, ignore_errors=True)
     (ROOT / "VERSION").write_text(remote + "\n")
     print("re-applying installed systems...")
     cmd_sync()
@@ -263,7 +273,7 @@ def notice_update():
         st = load_json(STATE, {"installed": {}})
         cache = st.get("update_check") or {}
         now = datetime.now().timestamp()
-        if now - cache.get("at", 0) > 86400:
+        if now - cache.get("at", 0) > 3600:
             t = remote_tag()
             if t:
                 cache = {"at": now, "latest": t}
