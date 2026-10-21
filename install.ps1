@@ -80,11 +80,14 @@ elseif (-not $Systems -or $Systems.Count -eq 0) {
     $Systems = @('reversing')
   } else {
     # TUI: arrows move, space toggles, 'a' all, enter confirms, esc cancels
-    $sel = @($avail | ForEach-Object { $false })
+    $sel = @($avail | ForEach-Object { $_ -eq 'reversing' })   # reversing preselected
     $pos = 0
     $maxw = ($avail | Measure-Object -Maximum { $_.Length }).Maximum
-    Write-Host "Select systems: up/down=move  space=toggle  a=all  enter=confirm (none=all)  esc=cancel"
-    foreach ($s in $avail) { Write-Host "    [ ] $($s.PadRight($maxw))" }
+    Write-Host "Select systems: up/down=move  space=toggle  a=all  enter=confirm  esc=cancel"
+    for ($j = 0; $j -lt $avail.Count; $j++) {
+      $m = if ($sel[$j]) { '[x]' } else { '[ ]' }
+      Write-Host "    $m $($avail[$j].PadRight($maxw))"
+    }
     $lines = $avail.Count
     :pick while ($true) {
       $k = [Console]::ReadKey($true)
@@ -101,8 +104,8 @@ elseif (-not $Systems -or $Systems.Count -eq 0) {
         Write-Host ("  {0} {1} {2}" -f $ptr, $mark, $avail[$j].PadRight($maxw))
       }
     }
-    if (-not ($sel -contains $true)) { $Systems = $avail }  # enter with none selected = all
-    else { $Systems = @($avail | Where-Object { $sel[$avail.IndexOf($_)] }) }
+    if (-not ($sel -contains $true)) { Write-Host "nothing selected - cancelled"; exit 0 }
+    $Systems = @($avail | Where-Object { $sel[$avail.IndexOf($_)] })
   }
 }
 $Systems = @($Systems | Where-Object { $avail -contains $_ })
