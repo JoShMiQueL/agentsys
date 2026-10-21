@@ -26,6 +26,7 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
   Invoke-WebRequest "https://github.com/$repo/archive/$ref.zip" -OutFile $zip
   Expand-Archive $zip "$env:TEMP\agentsys-x" -Force
   $src = (Get-ChildItem "$env:TEMP\agentsys-x" -Directory | Select-Object -First 1).FullName
+  New-Item -ItemType Directory -Force $Dest | Out-Null
   Copy-Item "$src\*" $Dest -Recurse -Force
   Remove-Item $zip, "$env:TEMP\agentsys-x" -Recurse -Force
   if ($tag) { Set-Content "$Dest\VERSION" $tag }
