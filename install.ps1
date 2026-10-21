@@ -5,7 +5,7 @@ param(
   [string[]]$Systems = @('reversing'),
   [switch]$SkipModels,
   [switch]$NoDeps,
-  [string]$Dest = "$env:USERPROFILE\.agent-systems"
+  [string]$Dest = "$env:USERPROFILE\.agentsys"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,11 +18,11 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
     git -C $Dest pull --ff-only
   } else {
     Write-Host "downloading $repo -> $Dest" -ForegroundColor Cyan
-    $zip = "$env:TEMP\agent-systems.zip"
+    $zip = "$env:TEMP\agentsys.zip"
     Invoke-WebRequest "https://github.com/$repo/archive/refs/heads/master.zip" -OutFile $zip
-    Expand-Archive $zip "$env:TEMP\agent-systems-x" -Force
-    Move-Item "$env:TEMP\agent-systems-x\agent-systems-master" $Dest -Force
-    Remove-Item $zip, "$env:TEMP\agent-systems-x" -Recurse -Force
+    Expand-Archive $zip "$env:TEMP\agentsys-x" -Force
+    Move-Item "$env:TEMP\agentsys-x\agent-systems-master" $Dest -Force
+    Remove-Item $zip, "$env:TEMP\agentsys-x" -Recurse -Force
   }
   $args2 = @("-Systems", ($Systems -join ','))
   if ($SkipModels) { $args2 += '-SkipModels' }
