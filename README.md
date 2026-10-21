@@ -6,10 +6,11 @@ Añadir uno nuevo = crear `systems/<nombre>/system.json` (+ `models.json` opcion
 ## Install
 
 ```powershell
-git clone <repo>; cd agent-systems
-.\install.ps1                          # sistema 'reversing' (default)
-.\install.ps1 -Systems reversing,devin # varios a la vez
-.\install.ps1 -Systems devin -SkipModels
+# bun-style, no clone needed — installs everything:
+powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agent-systems/master/install.ps1 | iex"
+
+# or locally after clone:
+.\install.ps1 -Systems reversing,devin [-SkipModels] [-NoDeps]
 ```
 
 Fully automatic: missing deps (Python 3.11, Ollama, Node/opencode2) are
