@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # install.sh — agentsys installer for Linux/macOS
-# Remote: curl -fsSL https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.sh | sh
+# Remote: curl -fsSL https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.sh -o install.sh
+#         sh install.sh   (two-step lets you inspect before running)
 # Local:  sh install.sh [systems...]
 set -e
 REPO='JoShMiQueL/agentsys'

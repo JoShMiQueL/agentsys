@@ -58,9 +58,24 @@ so it always wins over every installed system:
 ## Install
 
 ```powershell
-# bun-style, no clone needed — installs the default (general) system:
-powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 | iex"
+# bun-style, no clone needed — installs the default (general) system.
+# download, inspect, then run — avoids Defender's irm|iex heuristic:
+iwr https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
 
+```sh
+# unix equivalent (Linux/macOS):
+curl -fsSL https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.sh -o install.sh
+sh install.sh
+```
+
+> **Troubleshooting — AV false positive:** Windows Defender may flag
+> `irm | iex` as `Trojan:Win32/Commando.A!ml` — a false positive on the
+> download-and-execute pattern. The two-step form above avoids it and lets
+> you inspect the script before running it.
+
+```powershell
 # or locally after clone — general is the default:
 .\install.ps1                            # general only
 .\install.ps1 -Systems general,reversing # both side by side

@@ -1,5 +1,18 @@
 # Gotchas discovered (opencode2 + local models)
 
+## Installer
+
+- **Defender flags `irm|iex` as `Trojan:Win32/Commando.A!ml`** — a false
+  positive on the download-execute heuristic. Document the two-step
+  `iwr -OutFile install.ps1` + `powershell -File .\install.ps1` instead;
+  never pipe `irm` to `iex` in docs.
+- **Interactive TUI picker (`[Console]::ReadKey`) fails when stdin is
+  redirected** — always pass `-Systems`/`-All`/`-NonInteractive` in
+  scripts/headless. install.ps1 catches the failure and defaults to
+  `general`.
+- **`curl | sh` on unix is the same pattern** (less AV-sensitive, but same
+  blind-execution risk) — docs prefer `curl -o install.sh` + `sh install.sh`.
+
 ## Session hangs
 
 - **Out-of-workspace access = eternal hang in headless.** `read`/`glob` on

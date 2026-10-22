@@ -1,5 +1,7 @@
 # install.ps1 - agent-systems installer (bun-style)
-# Remote:  powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 | iex"
+# Remote:  iwr https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 -OutFile install.ps1
+#          powershell -ExecutionPolicy Bypass -File .\install.ps1
+#          (two-step avoids Defender's irm|iex Commando.A!ml heuristic)
 # Local:   .\install.ps1 [-Systems a,b] [-SkipModels] [-NoDeps]
 # Init:    .\install.ps1 -InitProject [path] [-Force]  (seed .opencode/ into a project)
 param(
@@ -133,7 +135,14 @@ elseif (-not $Systems -or $Systems.Count -eq 0) {
     }
     $lines = $avail.Count
     :pick while ($true) {
-      $k = [Console]::ReadKey($true)
+      try { $k = [Console]::ReadKey($true) }
+      catch {
+        # stdin redirected / non-TTY console - fall back to default (general)
+        Write-Host "`n[warn] interactive picker unavailable (non-TTY input) - defaulting to 'general'" -ForegroundColor Yellow
+        Write-Host "       pass -Systems/-All/-NonInteractive in scripts/headless" -ForegroundColor DarkGray
+        $Systems = @('general')
+        break pick
+      }
       if ($k.Key -eq 'UpArrow')   { $pos = ($pos + $lines - 1) % $lines }
       elseif ($k.Key -eq 'DownArrow') { $pos = ($pos + 1) % $lines }
       elseif ($k.Key -eq 'Spacebar')  { $sel[$pos] = -not $sel[$pos] }
