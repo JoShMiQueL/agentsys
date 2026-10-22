@@ -42,5 +42,5 @@ systems/<nombre>/
 
 ## Memoria persistente
 
-`AGENTS.md` en raíz (leído por opencode y devin) → `context/`:
+`AGENTS.md` en raíz (leído por opencode y devin) → `.agents/`:
 `models.md`, `gotchas.md`, `decisions.md`. Actualizar tras cada descubrimiento.

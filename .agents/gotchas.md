@@ -25,3 +25,15 @@
 - `agents.*.model` display may show the global default — verify actual model
   in session_v2 DB if it matters.
 - MCP `chrome-devtools` adds 32 tool schemas to every session — remove if unused.
+
+## Plugins (v2)
+- Dirs under `~/.config/opencode/plugins/<name>/` are auto-discovered — no
+  `plugins` key needed in opencode.json.
+- A configured `deny` permission rule is FINAL: it short-circuits before
+  `permission.hook("evaluate")` runs. To give agents feedback instead of silent
+  blocks, keep deny patterns out of `permissions` and let a plugin (see
+  `plugins/guard`) set `event.effect="deny"` + `event.message` in the hook —
+  the message reaches the model as a Tool.Error.
+- `merge_config.py` only APPENDS to list-of-dicts (permissions): removing a
+  deny rule from a system.json fragment does NOT remove it from the installed
+  opencode.json — clean it manually.

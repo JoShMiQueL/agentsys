@@ -12,6 +12,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# normalize -Systems: accept 'a,b', 'a','b', or bare string across -File/-Command/REPL
+$Systems = @($Systems | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+
 # --- bootstrap: running via irm (no local repo) -> fetch repo, re-run self ---
 if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems'))) {
   $repo = 'JoShMiQueL/agentsys'
@@ -145,6 +148,18 @@ Write-Host "[4/4] merging into opencode.json..." -ForegroundColor DarkGray
 New-Item -ItemType Directory -Force $cfgDir | Out-Null
 if ($frags.Count) {
   python -X utf8 "$root\merge_config.py" --config "$cfgDir\opencode.json" @frags
+}
+
+# sync repo plugins -> ~/.config/opencode/plugins (auto-discovered by OpenCode 2)
+$srcPlugins = Join-Path $root 'plugins'
+if (Test-Path $srcPlugins) {
+  $dstPlugins = Join-Path $cfgDir 'plugins'
+  foreach ($p in Get-ChildItem $srcPlugins -Directory) {
+    $dst = Join-Path $dstPlugins $p.Name
+    New-Item -ItemType Directory -Force $dst | Out-Null
+    Copy-Item "$($p.FullName)\*" $dst -Recurse -Force
+    Write-Host "  [plugin] $($p.Name) -> $dst" -ForegroundColor DarkGray
+  }
 }
 
 Write-Host "`nInstalled systems: $($Systems -join ', ')" -ForegroundColor Green

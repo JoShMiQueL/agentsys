@@ -5,7 +5,7 @@ Multiple systems coexist safely: each is a named set of agents merged into
 (`re`/`explorer`/`coder`/`analyst`/`deep` vs `gen`/`dexplore`/`dcoder`/`danalyst`)
 and each primary knows its own roster by exact name.
 
-Read `context/` for persistent memory before changing anything.
+Read `.agents/` for persistent memory before changing anything.
 
 ## Layout
 
@@ -15,7 +15,7 @@ Read `context/` for persistent memory before changing anything.
 - `merge_config.py` — deep-merge with auto-backup of opencode.json
 - `tools/bench/` — Ollama multi-model benchmark suite
 - `tools/opencode-debug/` — session DB inspection + config schema probes
-- `context/` — project memory (models.md, gotchas.md, decisions.md)
+- `.agents/` — project memory (models.md, gotchas.md, decisions.md)
 
 ## Install / sync
 
@@ -30,7 +30,7 @@ Top-level defaults (`model`, `default_agent`) are last-write-wins across
 systems; each primary agent still carries its own model. Switch systems by
 choosing the agent (`/agent re` or `opencode2 run --agent re`).
 
-## Hard-won rules (details in context/gotchas.md)
+## Hard-won rules (details in .agents/gotchas.md)
 
 - v2 schema: `agents`+`system`+`model` (deprecated `agent`/`prompt` are ignored)
 - gpt-oss-abliterated requires `think:"low"`; `think:false` does not disable thinking
