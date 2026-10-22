@@ -1,0 +1,33 @@
+# Default: normalize text files to LF in the repo, platform-native on checkout.
+* text=auto
+
+# PowerShell scripts require CRLF on Windows for reliable parsing.
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell/Python/TS/JS/JSON/MD — keep LF in repo and working copy.
+*.sh text eol=lf
+*.py text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary files — never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.exe binary
+*.dll binary
+*.heapsnapshot binary
+*.mp4 binary

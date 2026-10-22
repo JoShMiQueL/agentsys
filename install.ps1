@@ -1,12 +1,15 @@
 # install.ps1 - agent-systems installer (bun-style)
 # Remote:  powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 | iex"
 # Local:   .\install.ps1 [-Systems a,b] [-SkipModels] [-NoDeps]
+# Init:    .\install.ps1 -InitProject [path] [-Force]  (seed .opencode/ into a project)
 param(
   [string[]]$Systems = @(),
   [switch]$SkipModels,
   [switch]$NoDeps,
   [switch]$All,
   [switch]$NonInteractive,
+  [string]$InitProject,
+  [switch]$Force,
   [string]$Dest = "$env:USERPROFILE\.agentsys"
 )
 
@@ -42,6 +45,8 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
   if ($NoDeps) { $args2 += '-NoDeps' }
   if ($All) { $args2 += '-All' }
   if ($NonInteractive) { $args2 += '-NonInteractive' }
+  if ($InitProject) { $args2 += @('-InitProject', $InitProject) }
+  if ($Force) { $args2 += '-Force' }
   $psExe = 'powershell'
   if (Get-Command pwsh -ErrorAction SilentlyContinue) { $psExe = 'pwsh' }
   & $psExe -ExecutionPolicy Bypass -File "$Dest\install.ps1" @args2
@@ -51,6 +56,38 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
 }
 
 $root = $PSScriptRoot
+
+# --- per-project init: seed .opencode/ into a project (memory, specs, proposals) ---
+if ($PSBoundParameters.ContainsKey('InitProject')) {
+  $target = if ($InitProject) { $InitProject } else { (Get-Location).Path }
+  $resolved = Resolve-Path -LiteralPath $target -ErrorAction SilentlyContinue
+  if (-not $resolved) { Write-Error "InitProject path not found: $InitProject"; exit 1 }
+  $target = $resolved.Path
+  $src = Join-Path $root 'templates\opencode'
+  if (-not (Test-Path $src)) { Write-Error "templates\opencode not found under $root"; exit 1 }
+  $dst = Join-Path $target '.opencode'
+  Write-Host "== agentsys init-project ==" -ForegroundColor Cyan
+  Write-Host "seeding $src -> $dst" -ForegroundColor DarkGray
+  $copied = 0; $skipped = 0
+  Get-ChildItem $src -Recurse -File -Force | ForEach-Object {
+    $rel = $_.FullName.Substring($src.Length).TrimStart('\','/')
+    $d = Join-Path $dst $rel
+    if ((Test-Path $d) -and -not $Force) {
+      Write-Host "  [skip] $rel (exists; use -Force to overwrite)" -ForegroundColor DarkYellow
+      $skipped++
+    } else {
+      $verb = if (Test-Path $d) { 'force' } else { 'copy' }
+      New-Item -ItemType Directory -Force (Split-Path $d) | Out-Null
+      Copy-Item $_.FullName $d -Force
+      Write-Host "  [$verb] $rel" -ForegroundColor DarkGray
+      $copied++
+    }
+  }
+  Write-Host "`nDone. $copied file(s) copied, $skipped skipped." -ForegroundColor Green
+  Write-Host "NOTE: skipped files were left untouched - your evolved .opencode/memory/" -ForegroundColor DarkGray
+  Write-Host "      is never clobbered unless you pass -Force." -ForegroundColor DarkGray
+  exit 0
+}
 
 function Ensure-Dep($cmd, $wingetId, $name) {
   if (Get-Command $cmd -ErrorAction SilentlyContinue) { return $true }
@@ -159,6 +196,29 @@ if (Test-Path $srcPlugins) {
     New-Item -ItemType Directory -Force $dst | Out-Null
     Copy-Item "$($p.FullName)\*" $dst -Recurse -Force
     Write-Host "  [plugin] $($p.Name) -> $dst" -ForegroundColor DarkGray
+  }
+}
+
+# global SDD skills -> ~/.config/opencode/skills (auto-discovered by OpenCode 2)
+$srcSkills = Join-Path $root '.opencode\skills'
+if (Test-Path $srcSkills) {
+  $dstSkills = Join-Path $cfgDir 'skills'
+  foreach ($s in Get-ChildItem $srcSkills -Directory) {
+    $dst = Join-Path $dstSkills $s.Name
+    New-Item -ItemType Directory -Force $dst | Out-Null
+    Copy-Item "$($s.FullName)\*" $dst -Recurse -Force
+    Write-Host "  [skill] $($s.Name) -> $dst" -ForegroundColor DarkGray
+  }
+}
+
+# global commands -> ~/.config/opencode/commands
+$srcCmds = Join-Path $root '.opencode\commands'
+if (Test-Path $srcCmds) {
+  $dstCmds = Join-Path $cfgDir 'commands'
+  New-Item -ItemType Directory -Force $dstCmds | Out-Null
+  foreach ($c in Get-ChildItem $srcCmds -File) {
+    Copy-Item $c.FullName $dstCmds -Force
+    Write-Host "  [command] $($c.Name) -> $dstCmds" -ForegroundColor DarkGray
   }
 }
 
