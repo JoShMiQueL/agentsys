@@ -69,3 +69,60 @@ decisions.md/gotchas.md would pollute every other repo's context. Now:
   specs/proposals dirs; existing files are never clobbered without `-Force`.
 - `instructions[]` in both system.json changed to `.opencode/memory/*.md`
   (project-relative), so memory reloads post-compaction from the repo itself.
+
+## Generalized systems for public use (2026-10-22)
+
+Decoupled rosters from specific providers/models so the repo works for anyone:
+
+- **`general`** is the new default system — provider-agnostic `gen`/`gen-*`
+  roster. Agents omit `model` entirely (verified optional in
+  `Config.AgentEncoded`, opencode.ai/config.json — no `required` list), so they
+  inherit the user's global `model` from opencode.json. It declares
+  `default_agent: gen` but no top-level `model` and no `plugins`.
+- **`devin` removed as a shipped system** — it was a personal provider config.
+  Now a documented customization: add the plugin to `plugins` + set `model`
+  fields. User's own devin config stays in their opencode.json.
+- **`reversing` stays optional** with the same roster; its `models.json`
+  (glmflash-abl/gptoss-abl/qwen38-abl aliases) is a *recommended preset*, not a
+  requirement — users with their own Ollama models edit `model` fields or skip
+  model creation (`-SkipModels`). Installers already tolerate absent
+  models.json.
+- **install.sh default fixed** (`reversing` → `general`) — was a divergence bug
+  vs install.ps1, which now defaults to `general` too.
+
+## User overrides overlay + shared-key unmerge fix (2026-10-22)
+
+- **Overlay mechanism chosen** for durable per-user/per-agent overrides:
+  `~/.config/opencode/agentsys-overrides.json`, merged last by cli.py and
+  install.ps1. Survives `git pull`, `agentsys sync`, and `update` (which wipes
+  INSTALL_DIR). Hand-editing opencode.json only worked for systems that don't
+  define the key (general's `model`); the overlay works for all three cases.
+- **Location = config dir, not `~/.agentsys/`** — `cmd_uninstall` rmtree's
+  INSTALL_DIR and the irm-bootstrap wipes `$Dest\*` on reinstall; the config
+  dir survives both. Uninstall unmerges the overlay but keeps the file.
+- **`remove()` re-merges survivors**: unmerge-only stripped keys shared by
+  multiple systems (`instructions` contributed by general+reversing vanished
+  when removing one). New order: pop state → unmerge removed frag → re-merge
+  every remaining installed system → overlay.
+- **List append-only limitation accepted**: overlay can add permission/
+  instruction items but cannot subtract; subtraction syntax is out of scope.
+- Overlay-overridden agents leave stubs on remove — documented as by-design.
+- `merge_config.py` stays overlay-agnostic; only install.ps1 appends the
+  overlay path to `@frags`. Full rationale: `.opencode/proposals/
+  user-overrides-design.md`.
+
+## Snapshot-based remove supersedes re-merge-only fix (2026-10-22)
+
+- `install()` now snapshots the merged fragment into
+  `agent-systems.json` (`installed.<name>.fragment`). `remove()` unmerges the
+  SNAPSHOT, not live `system.json` — uninstalls stay correct even if the repo
+  fragment changed after install (git pull renamed an agent, etc.).
+- Plain `unmerge` only deletes keys equal to the fragment value, leaving
+  diverged stubs (residue). `remove()` therefore hard-deletes each
+  fragment-defined agent unless a surviving system's fragment or the overlay
+  defines it, and force-pops `default_agent`/`model` the fragment owned
+  (restored by survivors/overlay when they define them).
+- `cmd_uninstall` uses the same path + drops cfg agents owned by no system
+  and no overlay. `cmd_doctor` reports `[warn] agent X untracked` for cfg
+  agents owned by neither — residue now surfaces instead of hiding.
+- Legacy state entries (no `fragment` key) fall back to live system.json.

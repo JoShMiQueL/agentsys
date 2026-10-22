@@ -1,9 +1,21 @@
-# agentsys — installable agent collections for OpenCode 2
+# agentsys — installable multi-system agent collections for OpenCode 2
 
 Multiple systems coexist safely: each is a named set of agents merged into
 `~/.config/opencode/opencode.json`. No collisions — agents are namespaced
 (`re`/`re-explorer`/`re-coder`/`re-analyst`/`re-deep` vs `gen`/`gen-explore`/`gen-coder`/`gen-analyst`)
 and each primary knows its own roster by exact name.
+
+**Default system = `general`** — provider-agnostic roster (`gen`/`gen-*`);
+agents define no `model`, so they inherit the global `model` from
+`opencode.json` (whatever provider the user configured). It sets
+`default_agent: gen` only. **`reversing` is an optional local profile**
+(abliterated Ollama agents `re`/`re-*`) for RE/privacy/offline work — its
+`models.json` is a recommended preset, not a requirement (edit `model` fields
+for your own Ollama models). It declares no top-level defaults, so installing
+it never steals the default; switch explicitly via `/agent re` or
+`opencode2 run --agent re`. A provider-specific roster (e.g. Devin's
+`swe-2-*` via `opencode-devin`) is a documented customization, not a shipped
+system.
 
 Read `.opencode/memory/` for persistent memory before changing anything.
 
@@ -35,8 +47,9 @@ specs must honor `.opencode/memory/constitution.md`. Design rationale:
 
 ```powershell
 git pull
-.\install.ps1                          # reversing system (default)
-.\install.ps1 -Systems reversing,devin # several systems side by side
+.\install.ps1                            # general system (default)
+.\install.ps1 -Systems general,reversing # several systems side by side
+.\install.ps1 -Systems reversing       # local RE profile only
 .\install.ps1 -SkipModels
 .\install.ps1 -InitProject .           # seed .opencode/ into the current project
 ```
@@ -46,8 +59,9 @@ per-repo: `-InitProject` copies `templates/opencode/` → `<path>/.opencode/`
 (skips existing files unless `-Force`).
 
 Top-level defaults (`model`, `default_agent`) are last-write-wins across
-systems; each primary agent still carries its own model. Switch systems by
-choosing the agent (`/agent re` or `opencode2 run --agent re`).
+systems. Agents without a `model` field inherit the global `model`; those with
+one keep their own. Switch systems by choosing the agent (`/agent re` or
+`opencode2 run --agent re`).
 
 ## Hard-won rules (details in .opencode/memory/gotchas.md)
 

@@ -30,6 +30,9 @@ ROOT = Path(__file__).resolve().parent
 SYSTEMS = ROOT / "systems"
 CFG = Path.home() / ".config" / "opencode" / "opencode.json"
 STATE = Path.home() / ".config" / "opencode" / "agent-systems.json"
+# User overrides overlay: lives next to opencode.json (NOT under ~/.agentsys,
+# which cmd_uninstall wipes). Merged LAST so it always wins over fragments.
+OVERLAY = CFG.parent / "agentsys-overrides.json"
 
 
 def load_json(p: Path, default):
@@ -74,6 +77,11 @@ def unmerge(dst, src):
     return dst
 
 
+def apply_overlay(cfg):
+    """Deep-merge the user overrides overlay into cfg. Missing file = no-op."""
+    return merge(cfg, load_json(OVERLAY, {}))
+
+
 def backup():
     if CFG.exists():
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -115,29 +123,65 @@ def install(name: str) -> bool:
             subprocess.run(["ollama", "create", m["alias"], "-f", str(mf)], check=True,
                            capture_output=True)
 
+    frag = load_json(frag_path, {})
     backup()
-    cfg = merge(load_json(CFG, {}), load_json(frag_path, {}))
+    cfg = apply_overlay(merge(load_json(CFG, {}), frag))
     save_json(CFG, cfg)
 
     state = load_json(STATE, {"installed": {}})
-    state["installed"][name] = {"at": datetime.now().isoformat()}
+    state["installed"][name] = {"at": datetime.now().isoformat(), "fragment": frag}
     save_json(STATE, state)
     print(f"  [ok] {name} installed")
     return True
 
 
+def _fragment_for(name: str, entry: dict | None) -> dict:
+    """Fragment to unmerge for `name`: install-time snapshot if recorded,
+    else live system.json (legacy state), else {}."""
+    if entry and entry.get("fragment"):
+        return entry["fragment"]
+    return load_json(SYSTEMS / name / "system.json", {})
+
+
 def remove(name: str) -> bool:
-    sdir = SYSTEMS / name
-    frag_path = sdir / "system.json"
-    if not frag_path.exists():
+    state = load_json(STATE, {"installed": {}})
+    entry = state["installed"].pop(name, None)
+    frag = _fragment_for(name, entry)
+    if not frag and entry is None:
         print(f"  [err] system '{name}' not found")
         return False
     backup()
-    cfg = unmerge(load_json(CFG, {}), load_json(frag_path, {}))
-    save_json(CFG, cfg)
-    state = load_json(STATE, {"installed": {}})
-    state["installed"].pop(name, None)
+    # 1. State already popped — the removed system can't re-apply itself below.
     save_json(STATE, state)
+    overlay = load_json(OVERLAY, {})
+    # 2. Unmerge the removed fragment.
+    cfg = unmerge(load_json(CFG, {}), frag)
+    # 3. Hard-clean agents: drop any agent the fragment defined unless a
+    #    surviving installed system also defines it or the overlay owns it —
+    #    plain unmerge leaves stubs when the live value diverged (e.g. the
+    #    user or a residue key changed a leaf).
+    survivors = {}
+    for other, oentry in state["installed"].items():
+        survivors[other] = _fragment_for(other, oentry)
+    survivor_agents = {a for f in survivors.values() for a in (f.get("agents") or {})}
+    overlay_agents = set((overlay.get("agents") or {}).keys())
+    cfg_agents = cfg.get("agents") or {}
+    for a in (frag.get("agents") or {}):
+        if a in cfg_agents and a not in survivor_agents and a not in overlay_agents:
+            del cfg_agents[a]
+    # 4. Scalars owned by the fragment (default_agent/model): delete even if
+    #    the live value diverged; survivors/overlay restore below if they
+    #    define them — else they stay gone.
+    for k in ("default_agent", "model"):
+        if k in frag and k not in overlay:
+            cfg.pop(k, None)
+    # 5. Re-merge every remaining installed system — restores keys shared
+    #    with the removed fragment that unmerge stripped (e.g. instructions).
+    for f in survivors.values():
+        cfg = merge(cfg, f)
+    # 6. User overlay always last.
+    cfg = merge(cfg, overlay)
+    save_json(CFG, cfg)
     print(f"  [ok] {name} removed")
     return True
 
@@ -191,10 +235,17 @@ def cmd_sync():
 
 def cmd_doctor():
     ok = True
+    drifts = 0
     def chk(name, good, extra=""):
         nonlocal ok
         ok &= good
         print(f"  [{'ok' if good else 'FAIL'}] {name} {extra}")
+    def drift(name, extra="run: agentsys sync"):
+        nonlocal drifts
+        drifts += 1
+        print(f"  [drift] {name} — {extra}")
+    def info(name):
+        print(f"  [warn] {name}")
     try:
         urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5)
         chk("ollama api", True)
@@ -210,14 +261,58 @@ def cmd_doctor():
         for m in json.loads((sdir / "models.json").read_text())["models"]:
             chk(f"model {m['alias']}", m["alias"] + ":latest" in have)
     cfg = load_json(CFG, {})
+    state = load_json(STATE, {"installed": {}})["installed"]
+    overlay = load_json(OVERLAY, {})
+    overlay_agents = overlay.get("agents") or {}
+    overlay_instr = set(overlay.get("instructions") or [])
+    cfg_agents = cfg.get("agents") or {}
+    cfg_instr = set(cfg.get("instructions") or [])
     for name in system_dirs():
         frag = load_json(SYSTEMS / name / "system.json", {})
-        for a in (frag.get("agents") or {}):
-            present = a in (cfg.get("agents") or {})
-            state = load_json(STATE, {"installed": {}})["installed"]
-            want = name in state
-            chk(f"agent {a} ({name})", present or not want)
-    print("doctor:", "healthy" if ok else "issues found")
+        frag_agents = frag.get("agents") or {}
+        # a system counts as installed if tracked in state or all agents present
+        installed = name in state or (frag_agents
+                                    and all(a in cfg_agents for a in frag_agents))
+        for a, spec in frag_agents.items():
+            present = a in cfg_agents
+            chk(f"agent {a} ({name})", present or not installed)
+            if present and installed:
+                # user-overridden agents are intentional, not drift
+                if a in overlay_agents:
+                    continue
+                if (cfg_agents[a].get("system") or "") != (spec.get("system") or ""):
+                    drift(f"agent {a} ({name}) — system prompt differs")
+        if installed:
+            frag_instr = set(frag.get("instructions") or [])
+            # frag instructions must all be present in the merged config;
+            # items re-added by the overlay count as covered
+            if frag_instr and not frag_instr.issubset(cfg_instr | overlay_instr):
+                missing = sorted(frag_instr - cfg_instr - overlay_instr)
+                drift(f"instructions ({name}) — missing: {', '.join(missing)}")
+    # untracked agents: in cfg but not owned by any installed system nor the
+    # overlay (residue from older remove/unmerge paths)
+    tracked = set()
+    for name in system_dirs():
+        frag = load_json(SYSTEMS / name / "system.json", {})
+        frag_agents = frag.get("agents") or {}
+        installed = name in state or (frag_agents
+                                    and all(a in cfg_agents for a in frag_agents))
+        if installed:
+            tracked |= set(frag_agents)
+    for a in sorted(cfg_agents):
+        if a not in tracked and a not in overlay_agents:
+            info(f"agent {a} untracked — not defined by any installed system "
+                 f"nor covered by overrides")
+    remote = remote_tag()
+    local = local_version()
+    if remote and local and _ver(remote) > _ver(local):
+        info(f"repo updated to {remote} but local is {local} — run: agentsys update")
+    if not ok:
+        print("doctor: issues found")
+    elif drifts:
+        print(f"doctor: healthy, {drifts} drift(s) — run: agentsys sync")
+    else:
+        print("doctor: healthy")
 
 
 REPO = "JoShMiQueL/agentsys"
@@ -353,20 +448,45 @@ def cmd_uninstall():
     """Remove every installed system + CLI itself. Ollama models untouched."""
     cfg = load_json(CFG, {})
     cfg_agents = cfg.get("agents") or {}
-    names = set((load_json(STATE, {"installed": {}})["installed"]).keys())
+    state = load_json(STATE, {"installed": {}})
+    names = set(state["installed"].keys())
     # also detect systems whose agents are present but not state-tracked
     for n in system_dirs():
         frag = load_json(SYSTEMS / n / "system.json", {})
         ags = (frag.get("agents") or {}).keys()
         if ags and all(a in cfg_agents for a in ags):
             names.add(n)
+    overlay = load_json(OVERLAY, {})
+    overlay_agents = set((overlay.get("agents") or {}).keys())
     for name in names:
-        frag = SYSTEMS / name / "system.json"
-        if frag.exists():
-            cfg = unmerge(cfg, load_json(frag, {}))
+        frag = _fragment_for(name, state["installed"].get(name))
+        if frag:
+            cfg = unmerge(cfg, frag)
+            # hard-clean: drop agents owned by the removed system unless the
+            # overlay covers them (overlay-owned keys persist by design)
+            for a in (frag.get("agents") or {}):
+                if a in (cfg.get("agents") or {}) and a not in overlay_agents:
+                    del cfg["agents"][a]
         print(f"  [unmerged] {name}")
+    # drop leftover cfg agents not owned by any system nor the overlay —
+    # untracked residue that unmerge alone would leave behind
+    system_agents = set()
+    for n in system_dirs():
+        system_agents |= set((load_json(SYSTEMS / n / "system.json", {})
+                              .get("agents") or {}).keys())
+    for a in list((cfg.get("agents") or {}).keys()):
+        if a not in system_agents and a not in overlay_agents:
+            del cfg["agents"][a]
+            print(f"  [dropped] untracked agent {a}")
+    # user overrides were merged last on install — unmerge them too so the
+    # config is clean; the FILE stays on disk (user data).
+    if overlay:
+        cfg = unmerge(cfg, overlay)
+        print(f"  [unmerged] user overrides")
     backup()
     save_json(CFG, cfg)
+    if OVERLAY.exists():
+        print(f"  note: user overrides kept at {OVERLAY}")
     _unpath()
     if STATE.exists():
         STATE.unlink()

@@ -118,10 +118,10 @@ $avail = @(Get-ChildItem (Join-Path $root 'systems') -Directory | Select-Object 
 if ($All) { $Systems = $avail }
 elseif (-not $Systems -or $Systems.Count -eq 0) {
   if ($NonInteractive) {
-    $Systems = @('reversing')
+    $Systems = @('general')
   } else {
     # TUI: arrows move, space toggles, 'a' all, enter confirms, esc cancels
-    $sel = @($avail | ForEach-Object { $_ -eq 'reversing' })   # reversing preselected
+    $sel = @($avail | ForEach-Object { $_ -eq 'general' })   # general preselected (default system)
     $pos = 0
     $maxw = ($avail | Measure-Object -Maximum { $_.Length }).Maximum
     Write-Host "Select systems: up/down=move  space=toggle  a=all  enter=confirm  esc=cancel"
@@ -180,6 +180,10 @@ foreach ($sys in $Systems) {
   $frag = Join-Path $sdir 'system.json'
   if (Test-Path $frag) { $frags += $frag }
 }
+
+# user overrides overlay merges last so it always wins over fragments
+$overlay = Join-Path $cfgDir 'agentsys-overrides.json'
+if (Test-Path $overlay) { $frags += $overlay }
 
 Write-Host "[4/4] merging into opencode.json..." -ForegroundColor DarkGray
 New-Item -ItemType Directory -Force $cfgDir | Out-Null

@@ -1,5 +1,4 @@
 {
-  "default_agent": "re",
   "agents": {
     "re": {
       "mode": "primary",

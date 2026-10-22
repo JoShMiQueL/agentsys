@@ -1,16 +1,71 @@
-# agentsys — colección instalable de sistemas de agentes para OpenCode 2
+# agentsys — multi-system agent collections for OpenCode 2
 
-Cada carpeta en `systems/` es un sistema completo e instalable con un comando.
-Añadir uno nuevo = crear `systems/<nombre>/system.json` (+ `models.json` opcional).
+Each folder in `systems/` is a complete, installable agent system — one command
+merges it into `~/.config/opencode/opencode.json` with no collisions (agents are
+namespaced: `re`/`re-*` vs `gen`/`gen-*`).
+
+- **`general` (default)** — provider-agnostic roster: a `gen` orchestrator plus
+  `gen-explore`/`gen-coder`/`gen-analyst` subagents. Agents carry no `model`
+  field, so they inherit whatever global `model` you already have in
+  `opencode.json`. Sets `default_agent: gen` only.
+- **`reversing` (optional local profile)** — local abliterated Ollama models for
+  reverse-engineering / privacy-sensitive / offline work. Its `models.json` is a
+  *recommended preset*, not a requirement: if you already run your own Ollama
+  models, edit the `model` fields in `system.json` (or skip model creation with
+  `-SkipModels`). It does NOT steal the default: switch explicitly with
+  `/agent re` or `opencode2 run --agent re`.
+
+Adding a new system = creating `systems/<name>/system.json`
+(+ `models.json` optional).
+
+## Bring your own models
+
+`general` deliberately defines no models. Agents without a `model` field fall
+back to your top-level `model` in `opencode.json` — set that once (any provider:
+Anthropic, OpenAI, Ollama, a plugin provider...) and the whole roster uses it.
+To pin a specific model per agent, add `"model": "provider/model"` to that
+agent's entry in `systems/general/system.json` (or edit the merged
+`opencode.json` after install). To use a plugin-backed provider (e.g. Devin
+`swe-2-*` via `opencode-devin`), add the plugin to `plugins` and set models
+accordingly.
+
+## User overrides
+
+`~/.config/opencode/agentsys-overrides.json` is an optional sparse overlay —
+same schema as `system.json` — merged **last** by `cli.py` and `install.ps1`,
+so it always wins over every installed system:
+
+```json
+{
+  "agents": {
+    "gen-coder": { "model": "ollama/devstral-abl:latest" },
+    "re-deep":   { "model": "ollama/qwen38-abl:latest", "options": {"num_ctx": 32768} }
+  }
+}
+```
+
+- Survives `agentsys sync`, `update`, and `git pull`.
+- `agentsys remove <name>` is a **total** uninstall: every agent the system
+  defined is deleted from `opencode.json` (snapshot-based, zero residue) —
+  **except** agents your overlay covers, which persist by design. Delete the
+  overlay entry yourself if you want it gone.
+- `agentsys uninstall` unmerges the overlay but keeps the file on disk.
+- Limitation: lists are append-only — the overlay can add `permissions` or
+  `instructions` items but cannot remove one a fragment contributed.
+- `doctor` treats overlay-covered keys as intentional, not drift, and warns
+  about untracked agents (residue owned by no installed system).
 
 ## Install
 
 ```powershell
-# bun-style, no clone needed — installs everything:
+# bun-style, no clone needed — installs the default (general) system:
 powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/install.ps1 | iex"
 
-# or locally after clone:
-.\install.ps1 -Systems reversing,devin [-SkipModels] [-NoDeps]
+# or locally after clone — general is the default:
+.\install.ps1                            # general only
+.\install.ps1 -Systems general,reversing # both side by side
+.\install.ps1 -Systems reversing         # local RE profile only
+.\install.ps1 -SkipModels -NoDeps        # skip Ollama models / dep auto-install
 
 # seed .opencode/ (memory, specs, proposals) into a project:
 .\install.ps1 -InitProject <path-to-project> [-Force]
@@ -18,9 +73,11 @@ powershell -c "irm https://raw.githubusercontent.com/JoShMiQueL/agentsys/master/
 
 Fully automatic: missing deps (Python 3.11, Ollama, Node/opencode2) are
 installed via `winget`/`npm`. Use `-NoDeps` to fail instead of auto-installing.
-`install.ps1` creates Ollama aliases declared in `models.json` and merges
-`system.json` into `~/.config/opencode/opencode.json` (idempotent, auto-backup
-`opencode.json.bak-<ts>.json`).
+`install.ps1` creates Ollama aliases declared in `models.json` (reversing only)
+and merges `system.json` into `~/.config/opencode/opencode.json` (idempotent,
+auto-backup `opencode.json.bak-<ts>.json`). Top-level defaults
+(`default_agent`, `model`) are last-write-wins across installed systems —
+general declares `default_agent` only; reversing declares neither.
 
 Installing any system also installs **global** OpenCode 2 resources so every
 project gets them:
@@ -37,32 +94,36 @@ from `templates/opencode/` — run `.\install.ps1 -InitProject` inside any proje
 overwritten unless you pass `-Force`. Agents load these via `instructions[]`
 (`.opencode/memory/*.md`) so they reload as the post-compaction baseline.
 
-## Sistemas incluidos
+## Included systems
 
-| sistema | modelos | agentes |
-|---|---|---|
-| `reversing` | glmflash-abl, gptoss-abl, qwen38-abl (Ollama locales) | re, re-explorer, re-coder, re-analyst, re-qa, re-reviewer, re-deep |
-| `devin` | swe-2-* cloud (plugin `opencode-devin`) | gen, gen-explore, gen-coder, gen-analyst |
+| system | models | agents | role |
+|---|---|---|---|
+| `general` | none — inherits your global `model` | gen, gen-explore, gen-coder, gen-analyst | **default** — provider-agnostic general work |
+| `reversing` | glmflash-abl, gptoss-abl, qwen38-abl (recommended local Ollama preset, editable) | re, re-explorer, re-coder, re-analyst, re-qa, re-reviewer, re-deep | optional RE/privacy profile |
 
-## Anatomía de un sistema
+## Anatomy of a system
 
 ```
-systems/<nombre>/
-  system.json     # fragmento opencode: agents/providers/permissions/compaction/plugins
-  models.json     # [{alias, file, pull}] — modelos Ollama requeridos (opcional)
-  models/         # Modelfiles referenciados (opcional)
+systems/<name>/
+  system.json     # opencode fragment: agents/providers/permissions/compaction/plugins
+  models.json     # [{alias, file, pull}] — required Ollama models (optional)
+  models/         # referenced Modelfiles (optional)
 ```
 
 ## Tools
 
-- `tools/bench/` — suite de benchmarks Ollama multi-modelo (`bench.py`, `compare.py`, resultados)
-- `tools/opencode-debug/` — inspección de sesiones DB y schema probing
+- `cli.py` — `agentsys` CLI: `list`/`install`/`remove`/`sync`/`doctor`/`status`/
+  `version`/`update`/`uninstall`. `doctor` verifies ollama, opencode2, models,
+  config, and flags drift between repo fragments and the installed
+  `opencode.json` (fix with `agentsys sync`).
+- `tools/bench/` — Ollama multi-model benchmark suite (`bench.py`, `compare.py`, results)
+- `tools/opencode-debug/` — session DB inspection + config schema probes
 
-## Memoria persistente
+## Persistent memory
 
-`AGENTS.md` en raíz (leído por opencode y devin) → `.opencode/` (dir nativo de
-OpenCode 2): `memory/` con `models.md`, `gotchas.md`, `decisions.md` y
-`constitution.md` (se usa `memory/` porque `.opencode/agent/` es ruta reservada).
-Actualizar tras cada descubrimiento. También aloja el workspace SDD:
-`specs/<slug>/` (specs dirigidas por skills `sdd-*` en `.opencode/skills/`),
-`proposals/` y `commands/`.
+Root `AGENTS.md` (read by opencode and devin) → `.opencode/` (native OpenCode 2
+dir): `memory/` with `models.md`, `gotchas.md`, `decisions.md` and
+`constitution.md` (`memory/` because `.opencode/agent/` is a reserved path).
+Update after every notable discovery. It also hosts the SDD workspace:
+`specs/<slug>/` (specs driven by `sdd-*` skills in `.opencode/skills/`),
+`proposals/` and `commands/`.

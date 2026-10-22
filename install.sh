@@ -5,7 +5,7 @@
 set -e
 REPO='JoShMiQueL/agentsys'
 DEST="${AGENTSYS_HOME:-$HOME/.agentsys}"
-SYSTEMS="${*:-reversing}"
+SYSTEMS="${*:-general}"
 
 command -v curl  >/dev/null || { echo "curl required"; exit 1; }
 command -v unzip >/dev/null || { echo "unzip required"; exit 1; }
