@@ -5,7 +5,9 @@
 Commands:
   list                 systems available in the repo + install state
   install <name>...    pull/create ollama models + merge system.json
+                       (--dry-run / -n: compute + show diff, write nothing)
   remove <name>...     uninstall a system (agents/permissions/plugins/defaults)
+                       (--dry-run / -n: compute + show diff, write nothing)
   sync                 re-apply every installed system (after git pull)
   doctor               verify environment: ollama, opencode2, models, config
   version              installed version + update check
@@ -13,6 +15,7 @@ Commands:
 """
 from __future__ import annotations
 
+import copy
 import io
 import json
 import os
@@ -100,32 +103,76 @@ def system_dirs():
     return sorted(p.name for p in SYSTEMS.iterdir() if (p / "system.json").exists())
 
 
-def install(name: str) -> bool:
+def _diff_summary(before: dict, after: dict, name: str, overlay_used: bool):
+    """Compact ~15-line diff of what an install/remove would do to opencode.json."""
+    tag = "[dry]"
+    ba, aa = before.get("agents") or {}, after.get("agents") or {}
+    added = sorted(set(aa) - set(ba))
+    removed = sorted(set(ba) - set(aa))
+    changed = sorted(a for a in set(ba) & set(aa) if ba[a] != aa[a])
+    print(f"{tag} {name} - opencode.json diff summary")
+    if added:
+        print(f"{tag} agents added ({len(added)}): {', '.join(added)}")
+    if removed:
+        print(f"{tag} agents removed ({len(removed)}): {', '.join(removed)}")
+    for a in changed[:5]:
+        bks = ba[a] if isinstance(ba[a], dict) else {}
+        aks = aa[a] if isinstance(aa[a], dict) else {}
+        keys = sorted(k for k in set(bks) | set(aks) if bks.get(k) != aks.get(k))
+        print(f"{tag} agent {a} changed keys: {', '.join(keys)}")
+    if len(changed) > 5:
+        print(f"{tag} ... and {len(changed) - 5} more changed agent(s)")
+    for k in ("default_agent", "model"):
+        if before.get(k) != after.get(k):
+            print(f"{tag} {k}: {before.get(k)} -> {after.get(k)}")
+    bi, ai = before.get("instructions") or [], after.get("instructions") or []
+    if bi != ai:
+        print(f"{tag} instructions: {len(bi)} -> {len(ai)} item(s)")
+    bp, ap = len(before.get("permissions") or []), len(after.get("permissions") or [])
+    if bp != ap:
+        print(f"{tag} permissions: {bp} -> {ap} rule(s)")
+    print(f"{tag} overlay: {'applied' if overlay_used else 'not present'}")
+    if not (added or removed or changed) and before == after:
+        print(f"{tag} no changes")
+
+
+def install(name: str, dry: bool = False) -> bool:
     sdir = SYSTEMS / name
     frag_path = sdir / "system.json"
     if not frag_path.exists():
         print(f"  [err] system '{name}' not found")
         return False
 
-    have = ollama_models()
     mfile = sdir / "models.json"
     if mfile.exists():
-        for m in json.loads(mfile.read_text(encoding="utf-8"))["models"]:
-            alias = m["alias"] + ":latest"
-            if alias in have:
-                print(f"  [skip] {alias}")
-                continue
-            if m["pull"] not in have:
-                print(f"  [pull] {m['pull']}")
-                subprocess.run(["ollama", "pull", m["pull"]], check=True)
-            print(f"  [create] {m['alias']}")
-            mf = sdir / "models" / m["file"]
-            subprocess.run(["ollama", "create", m["alias"], "-f", str(mf)], check=True,
-                           capture_output=True)
+        models = json.loads(mfile.read_text(encoding="utf-8"))["models"]
+        if dry:
+            print(f"  [dry] would create/pull {len(models)} model(s): "
+                  + ", ".join(m["alias"] for m in models))
+        elif not shutil.which("ollama"):
+            print("  [warn] ollama not on PATH — skipping model setup")
+        else:
+            have = ollama_models()
+            for m in models:
+                alias = m["alias"] + ":latest"
+                if alias in have:
+                    print(f"  [skip] {alias}")
+                    continue
+                if m["pull"] not in have:
+                    print(f"  [pull] {m['pull']}")
+                    subprocess.run(["ollama", "pull", m["pull"]], check=True)
+                print(f"  [create] {m['alias']}")
+                mf = sdir / "models" / m["file"]
+                subprocess.run(["ollama", "create", m["alias"], "-f", str(mf)],
+                               check=True, capture_output=True)
 
     frag = load_json(frag_path, {})
+    before = load_json(CFG, {})
+    cfg = apply_overlay(merge(copy.deepcopy(before), frag))
+    if dry:
+        _diff_summary(before, cfg, f"install {name}", OVERLAY.exists())
+        return True
     backup()
-    cfg = apply_overlay(merge(load_json(CFG, {}), frag))
     save_json(CFG, cfg)
 
     state = load_json(STATE, {"installed": {}})
@@ -143,19 +190,17 @@ def _fragment_for(name: str, entry: dict | None) -> dict:
     return load_json(SYSTEMS / name / "system.json", {})
 
 
-def remove(name: str) -> bool:
+def remove(name: str, dry: bool = False) -> bool:
     state = load_json(STATE, {"installed": {}})
     entry = state["installed"].pop(name, None)
     frag = _fragment_for(name, entry)
     if not frag and entry is None:
         print(f"  [err] system '{name}' not found")
         return False
-    backup()
-    # 1. State already popped — the removed system can't re-apply itself below.
-    save_json(STATE, state)
     overlay = load_json(OVERLAY, {})
     # 2. Unmerge the removed fragment.
-    cfg = unmerge(load_json(CFG, {}), frag)
+    before = load_json(CFG, {})
+    cfg = unmerge(copy.deepcopy(before), frag)
     # 3. Hard-clean agents: drop any agent the fragment defined unless a
     #    surviving installed system also defines it or the overlay owns it —
     #    plain unmerge leaves stubs when the live value diverged (e.g. the
@@ -181,14 +226,21 @@ def remove(name: str) -> bool:
         cfg = merge(cfg, f)
     # 6. User overlay always last.
     cfg = merge(cfg, overlay)
+    if dry:
+        _diff_summary(before, cfg, f"remove {name}", bool(overlay))
+        return True
+    backup()
+    # State was already popped above — the removed system can't re-apply itself.
+    save_json(STATE, state)
     save_json(CFG, cfg)
     print(f"  [ok] {name} removed")
     return True
 
 
 def split_agents(agents: dict) -> tuple[list, list]:
-    prim = sorted(a for a, v in agents.items() if (v.get("mode") or "primary") in ("primary", "all"))
-    subs = sorted(a for a, v in agents.items() if v.get("mode") == "subagent")
+    d = {a: v for a, v in agents.items() if isinstance(v, dict)}
+    prim = sorted(a for a, v in d.items() if (v.get("mode") or "primary") in ("primary", "all"))
+    subs = sorted(a for a, v in d.items() if v.get("mode") == "subagent")
     return prim, subs
 
 
@@ -280,7 +332,9 @@ def cmd_doctor():
                 # user-overridden agents are intentional, not drift
                 if a in overlay_agents:
                     continue
-                if (cfg_agents[a].get("system") or "") != (spec.get("system") or ""):
+                live = cfg_agents[a] if isinstance(cfg_agents[a], dict) else {}
+                want = spec if isinstance(spec, dict) else {}
+                if (live.get("system") or "") != (want.get("system") or ""):
                     drift(f"agent {a} ({name}) — system prompt differs")
         if installed:
             frag_instr = set(frag.get("instructions") or [])
@@ -501,9 +555,13 @@ USAGE = __doc__
 
 def _dispatch(cmd: str, rest: list) -> int:
     if cmd == "install":
-        return 0 if all(install(n) for n in rest) else 1
+        dry = "--dry-run" in rest or "-n" in rest
+        names = [n for n in rest if n not in ("--dry-run", "-n")]
+        return 0 if all(install(n, dry) for n in names) else 1
     if cmd == "remove":
-        return 0 if all(remove(n) for n in rest) else 1
+        dry = "--dry-run" in rest or "-n" in rest
+        names = [n for n in rest if n not in ("--dry-run", "-n")]
+        return 0 if all(remove(n, dry) for n in names) else 1
     if cmd == "uninstall":
         cmd_uninstall(); return 0
     if cmd == "list":
@@ -531,7 +589,8 @@ def main() -> int:
         return 0
     cmd, rest = args[0], args[1:]
     rc = _dispatch(cmd, rest)
-    if cmd != "update":
+    # notice_update() caches to STATE — a write; skip on dry-run
+    if cmd != "update" and "--dry-run" not in rest and "-n" not in rest:
         notice_update()
     return rc
 

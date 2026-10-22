@@ -10,6 +10,7 @@ param(
   [switch]$NonInteractive,
   [string]$InitProject,
   [switch]$Force,
+  [switch]$DryRun,
   [string]$Dest = "$env:USERPROFILE\.agentsys"
 )
 
@@ -47,6 +48,7 @@ if (-not $PSScriptRoot -or -not (Test-Path (Join-Path $PSScriptRoot 'systems')))
   if ($NonInteractive) { $args2 += '-NonInteractive' }
   if ($InitProject) { $args2 += @('-InitProject', $InitProject) }
   if ($Force) { $args2 += '-Force' }
+  if ($DryRun) { $args2 += '-DryRun' }
   $psExe = 'powershell'
   if (Get-Command pwsh -ErrorAction SilentlyContinue) { $psExe = 'pwsh' }
   & $psExe -ExecutionPolicy Bypass -File "$Dest\install.ps1" @args2
@@ -162,7 +164,10 @@ foreach ($sys in $Systems) {
 
   # models declared by the system
   $mfile = Join-Path $sdir 'models.json'
-  if ((Test-Path $mfile) -and -not $SkipModels) {
+  if ((Test-Path $mfile) -and $DryRun -and -not $SkipModels) {
+    $n = (Get-Content $mfile | ConvertFrom-Json).models.Count
+    Write-Host "  [dry] would create/pull $n model(s) for $sys" -ForegroundColor DarkGray
+  } elseif ((Test-Path $mfile) -and -not $SkipModels) {
     $mj = Get-Content $mfile | ConvertFrom-Json
     foreach ($m in $mj.models) {
       if (ollama list 2>$null | Select-String "^$($m.alias):") {
@@ -186,14 +191,20 @@ $overlay = Join-Path $cfgDir 'agentsys-overrides.json'
 if (Test-Path $overlay) { $frags += $overlay }
 
 Write-Host "[4/4] merging into opencode.json..." -ForegroundColor DarkGray
-New-Item -ItemType Directory -Force $cfgDir | Out-Null
+if (-not $DryRun) { New-Item -ItemType Directory -Force $cfgDir | Out-Null }
 if ($frags.Count) {
-  python -X utf8 "$root\merge_config.py" --config "$cfgDir\opencode.json" @frags
+  $mcArgs = @("--config", "$cfgDir\opencode.json") + $frags
+  if ($DryRun) { $mcArgs += '--dry-run' }
+  python -X utf8 "$root\merge_config.py" @mcArgs
 }
 
 # sync repo plugins -> ~/.config/opencode/plugins (auto-discovered by OpenCode 2)
 $srcPlugins = Join-Path $root 'plugins'
-if (Test-Path $srcPlugins) {
+if ((Test-Path $srcPlugins) -and $DryRun) {
+  Get-ChildItem $srcPlugins -Directory | ForEach-Object {
+    Write-Host "  [dry] would copy plugin $($_.Name) -> $cfgDir\plugins" -ForegroundColor DarkGray
+  }
+} elseif (Test-Path $srcPlugins) {
   $dstPlugins = Join-Path $cfgDir 'plugins'
   foreach ($p in Get-ChildItem $srcPlugins -Directory) {
     $dst = Join-Path $dstPlugins $p.Name
@@ -205,7 +216,11 @@ if (Test-Path $srcPlugins) {
 
 # global SDD skills -> ~/.config/opencode/skills (auto-discovered by OpenCode 2)
 $srcSkills = Join-Path $root '.opencode\skills'
-if (Test-Path $srcSkills) {
+if ((Test-Path $srcSkills) -and $DryRun) {
+  Get-ChildItem $srcSkills -Directory | ForEach-Object {
+    Write-Host "  [dry] would copy skill $($_.Name) -> $cfgDir\skills" -ForegroundColor DarkGray
+  }
+} elseif (Test-Path $srcSkills) {
   $dstSkills = Join-Path $cfgDir 'skills'
   foreach ($s in Get-ChildItem $srcSkills -Directory) {
     $dst = Join-Path $dstSkills $s.Name
@@ -217,7 +232,9 @@ if (Test-Path $srcSkills) {
 
 # global commands -> ~/.config/opencode/commands
 $srcCmds = Join-Path $root '.opencode\commands'
-if (Test-Path $srcCmds) {
+if ((Test-Path $srcCmds) -and $DryRun) {
+  Write-Host "  [dry] would copy commands -> $cfgDir\commands" -ForegroundColor DarkGray
+} elseif (Test-Path $srcCmds) {
   $dstCmds = Join-Path $cfgDir 'commands'
   New-Item -ItemType Directory -Force $dstCmds | Out-Null
   foreach ($c in Get-ChildItem $srcCmds -File) {
@@ -226,5 +243,9 @@ if (Test-Path $srcCmds) {
   }
 }
 
-Write-Host "`nInstalled systems: $($Systems -join ', ')" -ForegroundColor Green
-Write-Host "opencode.json backup: $cfgDir\opencode.json.bak-<ts>.json"
+if ($DryRun) {
+  Write-Host "`n[dry] no files written - rerun without -DryRun to apply" -ForegroundColor Yellow
+} else {
+  Write-Host "`nInstalled systems: $($Systems -join ', ')" -ForegroundColor Green
+  Write-Host "opencode.json backup: $cfgDir\opencode.json.bak-<ts>.json"
+}
